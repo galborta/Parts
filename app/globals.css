@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 3.6%;
+  }
+
+  html.dark {
+    --background: 0 0% 3.6%;
+    --foreground: 0 0% 98.2%;
+  }
+
+  body {
+    @apply bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-50;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  * {
+    @apply border-slate-200 dark:border-slate-800;
+  }
+
+  button {
+    @apply transition-colors duration-200;
+  }
+
+  input,
+  textarea,
+  select {
+    @apply focus:outline-none focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400;
+  }
+}
+
+@layer components {
+  .container {
+    @apply mx-auto px-4 md:px-6 lg:px-8;
+  }
+
+  .glass {
+    @apply bg-white/10 dark:bg-slate-900/50 backdrop-blur-md border border-white/20 dark:border-slate-700/50;
+  }
+
+  .gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-blue-400;
+  }
+
+  .button-primary {
+    @apply px-6 py-3 bg-white text-slate-900 dark:bg-purple-600 dark:text-white rounded-lg font-semibold hover:shadow-lg transition-all duration-200;
+  }
+
+  .button-secondary {
+    @apply px-6 py-3 bg-slate-200 text-slate-900 dark:bg-slate-800 dark:text-slate-50 rounded-lg font-semibold hover:shadow-lg transition-all duration-200;
+  }
+}
+
+@layer utilities {
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+}

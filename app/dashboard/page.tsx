@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import dynamic from 'next/dynamic';
-import { AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import OnboardingFlow from '@/components/OnboardingFlow';
 import PartDetailPanel from '@/components/PartDetailPanel';
 import SelfLeadershipScore from '@/components/SelfLeadershipScore';
@@ -12,7 +12,6 @@ import { useAppStore, usePartsStore, useInsightsStore } from '@/lib/store';
 import { initUserPsyche, getMeta, getParts } from '@/lib/cloudflare';
 import { t } from '@/lib/i18n';
 
-// Dynamic import for Three.js (avoid SSR issues)
 const PartsMap3D = dynamic(
   () => import('@/components/three/PartsMap3D'),
   { ssr: false }
@@ -61,7 +60,6 @@ export default function DashboardPage() {
   const handleEndSession = useCallback(() => {
     setShowSession(false);
     setSessionPartId(null);
-    // Refresh parts data after session
     getParts().then(r => { if (r.parts) setParts(r.parts); }).catch(() => {});
   }, [setParts]);
 
@@ -71,7 +69,6 @@ export default function DashboardPage() {
 
   const handleOnboardingComplete = () => {
     setOnboarded(true);
-    // Refresh parts after onboarding
     getParts().then(r => { if (r.parts) setParts(r.parts); }).catch(() => {});
   };
 
@@ -80,8 +77,19 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen w-full bg-[#0a0a1a] flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen w-full bg-[#08080f] flex items-center justify-center">
+        <motion.div
+          className="flex flex-col items-center gap-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
+          <motion.div
+            className="w-12 h-12 rounded-full border-2 border-violet-500/30 border-t-violet-400"
+            animate={{ rotate: 360 }}
+            transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+          />
+          <span className="text-xs text-white/20">Loading your psyche...</span>
+        </motion.div>
       </div>
     );
   }
@@ -91,22 +99,39 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen w-full bg-[#0a0a1a] relative overflow-hidden">
+    <div className="min-h-screen w-full bg-[#08080f] relative overflow-hidden">
       {/* Header */}
-      <header className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between p-6">
-        <h1 className="text-xl font-bold text-white/80">Parts</h1>
+      <motion.header
+        className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-6 py-5"
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+      >
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500/80 to-indigo-600/80 flex items-center justify-center">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-white">
+              <circle cx="12" cy="12" r="3" fill="currentColor" opacity="0.9" />
+              <circle cx="12" cy="4" r="2" fill="currentColor" opacity="0.5" />
+              <circle cx="20" cy="12" r="2" fill="currentColor" opacity="0.5" />
+              <circle cx="12" cy="20" r="2" fill="currentColor" opacity="0.5" />
+              <circle cx="4" cy="12" r="2" fill="currentColor" opacity="0.5" />
+            </svg>
+          </div>
+          <span className="text-sm font-semibold text-white/60">Parts</span>
+        </div>
+
         <div className="flex items-center gap-4">
-          <span className="text-xs text-slate-500">{session?.user?.email}</span>
+          <span className="text-xs text-white/15 hidden sm:block">{session?.user?.email}</span>
           <button
             onClick={() => signOut({ callbackUrl: '/' })}
-            className="text-xs text-slate-500 hover:text-white transition-colors"
+            className="text-xs text-white/20 hover:text-white/50 transition-colors"
           >
             Sign out
           </button>
         </div>
-      </header>
+      </motion.header>
 
-      {/* 3D Parts Map — full viewport */}
+      {/* 3D Parts Map */}
       <div className="absolute inset-0">
         <PartsMap3D
           parts={parts}
@@ -115,16 +140,33 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* Self-Leadership Score */}
+      {/* Score */}
       <SelfLeadershipScore score={selfLeadershipScore} sessionCount={totalSessions} />
 
-      {/* Part count indicator */}
-      <div className="absolute bottom-6 right-6 z-30">
-        <div className="bg-slate-900/80 backdrop-blur-sm border border-slate-700/50 rounded-xl px-4 py-3 text-center">
-          <div className="text-2xl font-bold text-white">{parts.length}</div>
-          <div className="text-xs text-slate-400">{t('yourParts', language)}</div>
+      {/* Parts count */}
+      <motion.div
+        className="absolute bottom-6 right-6 z-30"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4 }}
+      >
+        <div className="glass rounded-xl px-5 py-3 text-center glow-sm">
+          <div className="text-xl font-bold text-white/80">{parts.length}</div>
+          <div className="text-[10px] text-white/20 uppercase tracking-wider">{t('yourParts', language)}</div>
         </div>
-      </div>
+      </motion.div>
+
+      {/* Hint text for empty state */}
+      {parts.length > 0 && !selectedPartId && !showSession && (
+        <motion.div
+          className="absolute top-20 left-1/2 -translate-x-1/2 z-20"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1 }}
+        >
+          <p className="text-xs text-white/15">Click a part to begin a session</p>
+        </motion.div>
+      )}
 
       {/* Part Detail Panel */}
       <AnimatePresence>
@@ -149,8 +191,8 @@ export default function DashboardPage() {
       </AnimatePresence>
 
       {/* Disclaimer */}
-      <div className="absolute bottom-1 left-1/2 -translate-x-1/2 z-20">
-        <p className="text-[10px] text-slate-600">
+      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20">
+        <p className="text-[9px] text-white/[0.08]">
           {t('disclaimer', language)}
         </p>
       </div>

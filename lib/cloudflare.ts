@@ -1,13 +1,27 @@
 const WORKER_URL = process.env.NEXT_PUBLIC_WORKER_URL || 'http://localhost:8787';
 
-async function getAuthToken(): Promise<string> {
+async function getSessionData(): Promise<{ token: string; email: string }> {
   const res = await fetch('/api/auth/session');
   const session = await res.json();
-  return session?.user?.id || '';
+
+  // NextAuth session contains the user data
+  // We'll pass the session token cookie directly and also send user info
+  const userId = (session?.user as any)?.id || session?.user?.email || '';
+  const email = session?.user?.email || '';
+
+  // Create a simple base64-encoded token the Worker can decode
+  const payload = {
+    userId,
+    email,
+    exp: Math.floor(Date.now() / 1000) + 3600, // 1 hour
+  };
+  const token = btoa(JSON.stringify({ alg: 'none' })) + '.' + btoa(JSON.stringify(payload)) + '.nosig';
+
+  return { token, email };
 }
 
 async function fetchFromWorker(path: string, options: RequestInit = {}): Promise<Response> {
-  const token = await getAuthToken();
+  const { token } = await getSessionData();
   return fetch(`${WORKER_URL}${path}`, {
     ...options,
     headers: {

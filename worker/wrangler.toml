@@ -10,9 +10,9 @@ bindings = [
 
 [[migrations]]
 tag = "v1"
-new_classes = ["UserPsyche"]
+new_sqlite_classes = ["UserPsyche"]
 
-[[ai]]
+[ai]
 binding = "AI"
 
 [vars]

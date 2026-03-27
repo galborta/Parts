@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useSession, signOut } from 'next-auth/react';
-import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
 import OnboardingFlow from '@/components/OnboardingFlow';
 import PartDetailPanel from '@/components/PartDetailPanel';
@@ -12,10 +11,7 @@ import { useAppStore, usePartsStore, useInsightsStore } from '@/lib/store';
 import { initUserPsyche, getMeta, getParts } from '@/lib/cloudflare';
 import { t } from '@/lib/i18n';
 
-const PartsMap3D = dynamic(
-  () => import('@/components/three/PartsMap3D'),
-  { ssr: false }
-);
+import PartsMap2D from '@/components/PartsMap2D';
 
 export default function DashboardPage() {
   const { data: session } = useSession();
@@ -25,6 +21,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [showSession, setShowSession] = useState(false);
   const [sessionPartId, setSessionPartId] = useState<string | null>(null);
+  const [initFailed, setInitFailed] = useState(false);
 
   useEffect(() => {
     if (!session?.user?.email) return;
@@ -37,6 +34,7 @@ export default function DashboardPage() {
         if (partsResult.parts) setParts(partsResult.parts);
       } catch (error) {
         console.error('Failed to initialize:', error);
+        setInitFailed(true);
       } finally {
         setLoading(false);
       }
@@ -57,6 +55,12 @@ export default function DashboardPage() {
     }
   }, [selectedPartId, selectPart]);
 
+  // Start a free session (no specific part — facilitator guides discovery)
+  const handleStartFreeSession = useCallback(() => {
+    setSessionPartId('free');
+    setShowSession(true);
+  }, []);
+
   const handleEndSession = useCallback(() => {
     setShowSession(false);
     setSessionPartId(null);
@@ -69,7 +73,9 @@ export default function DashboardPage() {
 
   const handleOnboardingComplete = () => {
     setOnboarded(true);
-    getParts().then(r => { if (r.parts) setParts(r.parts); }).catch(() => {});
+    // Automatically start a voice session after onboarding
+    setSessionPartId('free');
+    setShowSession(true);
   };
 
   const selectedPart = parts.find(p => p.id === selectedPartId) || null;
@@ -131,40 +137,47 @@ export default function DashboardPage() {
         </div>
       </motion.header>
 
-      {/* 3D Parts Map */}
-      <div className="absolute inset-0">
-        <PartsMap3D
-          parts={parts}
-          selfLeadershipScore={selfLeadershipScore}
-          onPartClick={handlePartClick}
-        />
-      </div>
+      {/* Parts Map */}
+      <PartsMap2D
+        parts={parts}
+        selfLeadershipScore={selfLeadershipScore}
+        onPartClick={handlePartClick}
+      />
 
       {/* Score */}
       <SelfLeadershipScore score={selfLeadershipScore} sessionCount={totalSessions} />
 
-      {/* Parts count */}
-      <motion.div
-        className="absolute bottom-6 right-6 z-30"
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-      >
-        <div className="glass rounded-xl px-5 py-3 text-center glow-sm">
-          <div className="text-xl font-bold text-white/80">{parts.length}</div>
-          <div className="text-[10px] text-white/20 uppercase tracking-wider">{t('yourParts', language)}</div>
-        </div>
-      </motion.div>
-
-      {/* Hint text for empty state */}
-      {parts.length > 0 && !selectedPartId && !showSession && (
+      {/* Start Session button — always visible when not in a session */}
+      {!showSession && (
         <motion.div
-          className="absolute top-20 left-1/2 -translate-x-1/2 z-20"
-          initial={{ opacity: 0, y: -10 }}
+          className="absolute bottom-24 left-1/2 -translate-x-1/2 z-30"
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1 }}
+          transition={{ delay: 0.5 }}
         >
-          <p className="text-xs text-white/15">Click a part to begin a session</p>
+          <motion.button
+            onClick={handleStartFreeSession}
+            className="btn-primary text-lg px-10 py-5 rounded-full"
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+          >
+            {t('startSession', language)}
+          </motion.button>
+        </motion.div>
+      )}
+
+      {/* Parts count */}
+      {parts.length > 0 && (
+        <motion.div
+          className="absolute bottom-6 right-6 z-30"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+        >
+          <div className="glass rounded-xl px-5 py-3 text-center glow-sm">
+            <div className="text-xl font-bold text-white/80">{parts.length}</div>
+            <div className="text-[10px] text-white/20 uppercase tracking-wider">{t('yourParts', language)}</div>
+          </div>
         </motion.div>
       )}
 

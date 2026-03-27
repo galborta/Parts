@@ -11,7 +11,22 @@
  * - 'score'          → ScoreHistory
  */
 
-import { getVoiceForArchetype } from '../lib/voices';
+import { DurableObject } from 'cloudflare:workers';
+
+// Voice ID mapping (inlined to avoid cross-package imports in Worker)
+const ARCHETYPE_VOICE_IDS: Record<string, string> = {
+  critic: 'DZyrV4biPT5EX8YED3PT',
+  perfectionist: 'DZyrV4biPT5EX8YED3PT',
+  inner_child: 'qSeXEcewz7tA0Q0qk9fH',
+  protector: 'gSYqSbtMajxq5LUT0bNl',
+  pleaser: 'qSeXEcewz7tA0Q0qk9fH',
+  exile: 'gSYqSbtMajxq5LUT0bNl',
+};
+
+function getVoiceForArchetype(archetype: string): string {
+  const key = archetype.toLowerCase().replace(/\s+/g, '_');
+  return ARCHETYPE_VOICE_IDS[key] || ARCHETYPE_VOICE_IDS.protector;
+}
 
 interface UserMeta {
   userId: string;
@@ -48,15 +63,11 @@ interface SessionIndexEntry {
   summary?: string;
 }
 
-export class UserPsyche {
-  private state: DurableObjectState;
-  private env: any;
+interface Env {
+  AI: Ai;
+}
 
-  constructor(state: DurableObjectState, env: any) {
-    this.state = state;
-    this.env = env;
-  }
-
+export class UserPsyche extends DurableObject<Env> {
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
     const pathname = url.pathname;
@@ -65,7 +76,6 @@ export class UserPsyche {
       return this.handleWebSocketUpgrade(request);
     }
 
-    // Route handlers
     if (pathname === '/api/init' && request.method === 'POST') return this.handleInit(request);
     if (pathname === '/api/meta' && request.method === 'GET') return this.handleGetMeta();
     if (pathname === '/api/parts' && request.method === 'GET') return this.handleGetParts();
@@ -127,9 +137,9 @@ export class UserPsyche {
   private async handleInit(request: Request): Promise<Response> {
     const { userId, email } = await request.json() as any;
 
-    const existing = await this.state.storage.get('meta') as UserMeta | undefined;
+    const existing = await this.ctx.storage.get('meta') as UserMeta | undefined;
     if (existing) {
-      const parts = await this.state.storage.get('parts') as Part[] || [];
+      const parts = await this.ctx.storage.get('parts') as Part[] || [];
       return Response.json({ status: 'already_initialized', meta: existing, parts });
     }
 
@@ -141,11 +151,11 @@ export class UserPsyche {
       onboarding: { completed: false, currentStep: 0 },
     };
 
-    await this.state.storage.put('meta', meta);
-    await this.state.storage.put('parts', []);
-    await this.state.storage.put('session_index', []);
-    await this.state.storage.put('insights', []);
-    await this.state.storage.put('score', { current: 0, history: [] });
+    await this.ctx.storage.put('meta', meta);
+    await this.ctx.storage.put('parts', []);
+    await this.ctx.storage.put('session_index', []);
+    await this.ctx.storage.put('insights', []);
+    await this.ctx.storage.put('score', { current: 0, history: [] });
 
     return Response.json({ status: 'initialized', meta, parts: [] });
   }
@@ -153,7 +163,7 @@ export class UserPsyche {
   // ── Meta ─────────────────────────────────────────────────
 
   private async handleGetMeta(): Promise<Response> {
-    const meta = await this.state.storage.get('meta') as UserMeta | undefined;
+    const meta = await this.ctx.storage.get('meta') as UserMeta | undefined;
     if (!meta) return Response.json({ error: 'User not initialized' }, { status: 404 });
     return Response.json({ meta });
   }
@@ -162,24 +172,24 @@ export class UserPsyche {
 
   private async handleUpdateLanguage(request: Request): Promise<Response> {
     const { language } = await request.json() as { language: 'en' | 'es' };
-    const meta = await this.state.storage.get('meta') as UserMeta | undefined;
+    const meta = await this.ctx.storage.get('meta') as UserMeta | undefined;
     if (!meta) return Response.json({ error: 'User not initialized' }, { status: 404 });
 
     meta.language = language;
-    await this.state.storage.put('meta', meta);
+    await this.ctx.storage.put('meta', meta);
     return Response.json({ meta });
   }
 
   // ── Parts ────────────────────────────────────────────────
 
   private async handleGetParts(): Promise<Response> {
-    const parts = await this.state.storage.get('parts') as Part[] || [];
+    const parts = await this.ctx.storage.get('parts') as Part[] || [];
     return Response.json({ parts });
   }
 
   private async handleAddPart(request: Request): Promise<Response> {
     const { name, archetype, description, personality, role, fear } = await request.json() as any;
-    const parts = await this.state.storage.get('parts') as Part[] || [];
+    const parts = await this.ctx.storage.get('parts') as Part[] || [];
 
     const newPart: Part = {
       id: crypto.randomUUID(),
@@ -201,7 +211,7 @@ export class UserPsyche {
     };
 
     parts.push(newPart);
-    await this.state.storage.put('parts', parts);
+    await this.ctx.storage.put('parts', parts);
 
     return Response.json({ part: newPart }, { status: 201 });
   }
@@ -210,7 +220,7 @@ export class UserPsyche {
 
   private async handleStartSession(request: Request): Promise<Response> {
     const { primaryPartId } = await request.json() as any;
-    const score = await this.state.storage.get('score') as any || { current: 0, history: [] };
+    const score = await this.ctx.storage.get('score') as any || { current: 0, history: [] };
 
     const session = {
       id: crypto.randomUUID(),
@@ -222,17 +232,15 @@ export class UserPsyche {
       selfLeadershipAfter: score.current,
     };
 
-    // Store the session
-    await this.state.storage.put(`session:${session.id}`, session);
+    await this.ctx.storage.put(`session:${session.id}`, session);
 
-    // Update session index
-    const index = await this.state.storage.get('session_index') as SessionIndexEntry[] || [];
+    const index = await this.ctx.storage.get('session_index') as SessionIndexEntry[] || [];
     index.push({
       id: session.id,
       startedAt: session.startedAt,
       primaryPartId,
     });
-    await this.state.storage.put('session_index', index);
+    await this.ctx.storage.put('session_index', index);
 
     return Response.json({ session }, { status: 201 });
   }
@@ -240,7 +248,7 @@ export class UserPsyche {
   private async handleEndSession(request: Request): Promise<Response> {
     const { sessionId, transcript } = await request.json() as any;
 
-    const session = await this.state.storage.get(`session:${sessionId}`) as any;
+    const session = await this.ctx.storage.get(`session:${sessionId}`) as any;
     if (!session) return Response.json({ error: 'Session not found' }, { status: 404 });
 
     session.endedAt = new Date().toISOString();
@@ -251,48 +259,46 @@ export class UserPsyche {
       session.transcript = transcript;
     }
 
-    await this.state.storage.put(`session:${sessionId}`, session);
+    await this.ctx.storage.put(`session:${sessionId}`, session);
 
-    // Update session index with duration
-    const index = await this.state.storage.get('session_index') as SessionIndexEntry[] || [];
+    const index = await this.ctx.storage.get('session_index') as SessionIndexEntry[] || [];
     const entry = index.find((e: SessionIndexEntry) => e.id === sessionId);
     if (entry) {
       entry.duration = session.duration;
-      await this.state.storage.put('session_index', index);
+      await this.ctx.storage.put('session_index', index);
     }
 
-    // Increment part's session count
-    const parts = await this.state.storage.get('parts') as Part[] || [];
+    const parts = await this.ctx.storage.get('parts') as Part[] || [];
     const part = parts.find(p => p.id === session.primaryPartId);
     if (part) {
       part.sessionCount++;
       part.lastSpokenTo = new Date().toISOString();
-      await this.state.storage.put('parts', parts);
+      await this.ctx.storage.put('parts', parts);
     }
 
     return Response.json({ session });
   }
 
   private async handleGetSessions(): Promise<Response> {
-    const index = await this.state.storage.get('session_index') as SessionIndexEntry[] || [];
+    const index = await this.ctx.storage.get('session_index') as SessionIndexEntry[] || [];
     return Response.json({ sessions: index });
   }
 
   // ── Insights ─────────────────────────────────────────────
 
   private async handleGetInsights(): Promise<Response> {
-    const insights = await this.state.storage.get('insights') || [];
+    const insights = await this.ctx.storage.get('insights') || [];
     return Response.json({ insights });
   }
 
   // ── Onboarding ───────────────────────────────────────────
 
   private async handleCompleteOnboarding(): Promise<Response> {
-    const meta = await this.state.storage.get('meta') as UserMeta | undefined;
+    const meta = await this.ctx.storage.get('meta') as UserMeta | undefined;
     if (!meta) return Response.json({ error: 'User not initialized' }, { status: 404 });
 
     meta.onboarding.completed = true;
-    await this.state.storage.put('meta', meta);
+    await this.ctx.storage.put('meta', meta);
     return Response.json({ meta });
   }
 }

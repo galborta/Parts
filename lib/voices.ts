@@ -16,12 +16,12 @@ export interface ArchetypeVoice {
   voiceId: string;         // ElevenLabs voice ID
 }
 
-// Facilitator voice (default voice on the agent)
+// Facilitator voice (default voice on the agent) — Victoria
 export const FACILITATOR_VOICE: ArchetypeVoice = {
   id: 'facilitator',
   label: 'Facilitator',
   character: 'Warm, calm, reassuring — like a trusted therapist',
-  voiceId: 'PLACEHOLDER_FACILITATOR',  // TODO: Replace with real voice ID
+  voiceId: 'qSeXEcewz7tA0Q0qk9fH',
 };
 
 // Part archetype voices (additional voices on the agent)
@@ -30,37 +30,37 @@ export const ARCHETYPE_VOICES: Record<string, ArchetypeVoice> = {
     id: 'critic',
     label: 'InnerCritic',
     character: 'Clipped, precise, slightly cold — male, mature, authoritative',
-    voiceId: 'PLACEHOLDER_CRITIC',     // TODO: Replace
+    voiceId: 'DZyrV4biPT5EX8YED3PT',  // Mario
   },
   perfectionist: {
     id: 'perfectionist',
     label: 'Perfectionist',
     character: 'Fast, anxious, detail-oriented — female, sharp, energetic',
-    voiceId: 'PLACEHOLDER_PERFECTIONIST',
+    voiceId: 'DZyrV4biPT5EX8YED3PT',  // Mario (reused — add unique voice later)
   },
   inner_child: {
     id: 'inner_child',
     label: 'InnerChild',
     character: 'Soft, small, vulnerable — young-sounding, gentle',
-    voiceId: 'PLACEHOLDER_INNER_CHILD',
+    voiceId: 'qSeXEcewz7tA0Q0qk9fH',  // Victoria (reused — add unique voice later)
   },
   protector: {
     id: 'protector',
     label: 'Protector',
     character: 'Strong, firm, defensive — deep male, commanding',
-    voiceId: 'PLACEHOLDER_PROTECTOR',
+    voiceId: 'gSYqSbtMajxq5LUT0bNl',  // Eder
   },
   pleaser: {
     id: 'pleaser',
     label: 'Pleaser',
     character: 'Warm, eager, slightly desperate — female, bright, accommodating',
-    voiceId: 'PLACEHOLDER_PLEASER',
+    voiceId: 'qSeXEcewz7tA0Q0qk9fH',  // Victoria (reused — add unique voice later)
   },
   exile: {
     id: 'exile',
     label: 'Exile',
     character: 'Quiet, fragile, hesitant — whispered, slow, trembling',
-    voiceId: 'PLACEHOLDER_EXILE',
+    voiceId: 'gSYqSbtMajxq5LUT0bNl',  // Eder (reused — add unique voice later)
   },
 };
 

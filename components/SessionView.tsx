@@ -9,7 +9,7 @@ import { useSessionStore, usePartsStore, useAppStore } from '@/lib/store';
 import { getArchetypeVoice } from '@/lib/voices';
 import { t } from '@/lib/i18n';
 
-const SESSION_DURATION_SEC = 7 * 60; // 7 minutes max
+const SESSION_DURATION_SEC = 90; // 90 seconds max — short focused Q&A
 
 interface SessionViewProps {
   partId: string;
@@ -203,7 +203,7 @@ function SessionViewInner({ partId, onEnd }: SessionViewProps) {
 
   const orbColor = activePart
     ? getArchetypeColor(activePart.archetype)
-    : '#a855f7';
+    : '#34d399';
 
   const speakerName = isSpeaking
     ? (activePart?.name || (language === 'es' ? 'Facilitador' : 'Facilitator'))
@@ -216,7 +216,7 @@ function SessionViewInner({ partId, onEnd }: SessionViewProps) {
   if (phase === 'summary') {
     return (
       <motion.div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-[#08080f] p-6"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-[#080f0b] p-6"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
       >
@@ -227,21 +227,21 @@ function SessionViewInner({ partId, onEnd }: SessionViewProps) {
           transition={{ delay: 0.2 }}
         >
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-white/[0.06] flex items-center justify-center mx-auto mb-6">
-            <span className="text-3xl">✦</span>
+            <span className="text-3xl">✓</span>
           </div>
 
           <h2 className="text-2xl font-bold text-white mb-2">
-            {language === 'es' ? 'Sesión Completa' : 'Session Complete'}
+            Insight Unlocked
           </h2>
           <p className="text-white/30 mb-8">
-            {formatTime(elapsed)} {language === 'es' ? 'minutos' : 'minutes'}
+            {formatTime(elapsed)}
           </p>
 
           {/* Session insight */}
           {sessionInsight && (
             <div className="glass rounded-xl p-5 mb-8 text-left">
               <h3 className="text-[10px] uppercase tracking-wider text-white/20 mb-2">
-                {language === 'es' ? 'Lo que descubrimos' : 'What we discovered'}
+                What we discovered
               </h3>
               <p className="text-sm text-white/50 leading-relaxed">{sessionInsight}</p>
             </div>
@@ -250,7 +250,7 @@ function SessionViewInner({ partId, onEnd }: SessionViewProps) {
           {/* Transcript summary */}
           <div className="glass rounded-xl p-5 mb-8 text-left">
             <h3 className="text-[10px] uppercase tracking-wider text-white/20 mb-2">
-              {language === 'es' ? 'Resumen' : 'Summary'}
+              Summary
             </h3>
             <div className="flex items-center gap-4 text-sm text-white/30">
               <span>{transcript.length} {language === 'es' ? 'intercambios' : 'exchanges'}</span>
@@ -265,7 +265,7 @@ function SessionViewInner({ partId, onEnd }: SessionViewProps) {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
-            {language === 'es' ? 'Guardar y Continuar' : 'Save & Continue'}
+            Save & Continue
           </motion.button>
         </motion.div>
       </motion.div>
@@ -275,7 +275,7 @@ function SessionViewInner({ partId, onEnd }: SessionViewProps) {
   // ── Active Session Screen ──────────────────────────────
   return (
     <motion.div
-      className="fixed inset-0 z-50 flex flex-col md:flex-row bg-[#08080f]"
+      className="fixed inset-0 z-50 flex flex-col md:flex-row bg-[#080f0b]"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}

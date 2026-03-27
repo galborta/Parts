@@ -11,7 +11,7 @@ interface VoiceOrbProps {
 export default function VoiceOrb({
   isSpeaking,
   speakerName,
-  color = '#a855f7',
+  color = '#34d399',
 }: VoiceOrbProps) {
   return (
     <div className="flex flex-col items-center gap-4">

@@ -1,12 +1,31 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import { signIn, useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 export default function Home() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (session) {
+      router.push('/dashboard');
+    }
+  }, [session, router]);
+
   const handleSignIn = () => {
-    // TODO: Implement Google OAuth sign-in
-    console.log('Sign in with Google clicked');
+    signIn('google', { callbackUrl: '/dashboard' });
   };
+
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen w-full bg-gradient-to-b from-slate-950 to-slate-900 flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-b from-slate-950 to-slate-900 flex items-center justify-center">

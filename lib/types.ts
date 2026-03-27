@@ -1,12 +1,14 @@
-export interface UserPsyche {
+// ── Core Data Model ──────────────────────────────────────
+
+export interface UserMeta {
   userId: string;
   email: string;
+  language: 'en' | 'es';
   createdAt: string;
-  updatedAt: string;
-  parts: Part[];
-  sessions: Session[];
-  insights: Insight[];
-  systemState: string;
+  onboarding: {
+    completed: boolean;
+    currentStep: number;
+  };
 }
 
 export interface Part {
@@ -14,61 +16,86 @@ export interface Part {
   name: string;
   archetype: string;
   voiceId: string;
+  role: string;
+  fear: string;
+  protects: string[];           // IDs of parts this part protects
   description: string;
   personality: string;
   wounds: string[];
   gifts: string[];
-  createdAt: string;
-  updatedAt: string;
+  dialogueHistory: DialogueTurn[];
+  discoveredAt: string;
+  lastSpokenTo: string;
+  sessionCount: number;
+  unburdened: boolean;
 }
 
 export interface Session {
   id: string;
-  userId: string;
-  partIds: string[];
+  primaryPartId: string;
   startedAt: string;
   endedAt?: string;
   transcript: TranscriptEntry[];
+  insights: string[];
+  selfLeadershipBefore: number;
+  selfLeadershipAfter: number;
   summary?: string;
-  keyInsights: Insight[];
   duration?: number;
-  emotion?: string;
+}
+
+export interface SessionIndexEntry {
+  id: string;
+  startedAt: string;
+  primaryPartId: string;
+  duration?: number;
+  summary?: string;
 }
 
 export interface TranscriptEntry {
   id: string;
   timestamp: string;
-  speaker: string;
-  speakerId: string;
+  speaker: 'user' | 'facilitator' | string;  // string = part name
   text: string;
-  audioUrl?: string;
   emotion?: string;
 }
 
 export interface DialogueTurn {
-  userText: string;
-  partResponse: string;
-  partId: string;
+  speaker: 'user' | 'part' | 'facilitator';
+  text: string;
   timestamp: string;
+  emotion?: string;
 }
 
 export interface Insight {
   id: string;
-  userId: string;
-  sessionId?: string;
-  content: string;
-  category: string;
-  timestamp: string;
-  embedding?: number[];
-  relatedParts: string[];
+  text: string;
+  relatedPartIds: string[];
+  surfacedAt: string;
+  sessionId: string;
+  acknowledged: boolean;
 }
 
+export interface ScoreHistory {
+  current: number;
+  history: { date: string; score: number }[];
+}
+
+// ── WebSocket Messages ───────────────────────────────────
+
 export interface WebSocketMessage {
-  type: 'init' | 'start_session' | 'send_message' | 'end_session' | 'get_insights';
+  type: 'init' | 'start_session' | 'send_message' | 'end_session' | 'get_insights' | 'update_language';
   payload: Record<string, unknown>;
 }
 
 export interface WebSocketResponse {
-  type: 'session_started' | 'message_received' | 'session_ended' | 'insights' | 'error';
+  type: 'session_started' | 'message_received' | 'session_ended' | 'insights' | 'error' | 'language_updated';
   data: Record<string, unknown>;
 }
+
+// ── DO Storage Keys ──────────────────────────────────────
+// 'meta'           → UserMeta
+// 'parts'          → Part[]
+// 'session:{id}'   → Session
+// 'session_index'  → SessionIndexEntry[]
+// 'insights'       → Insight[]
+// 'score'          → ScoreHistory

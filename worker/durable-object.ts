@@ -1,17 +1,60 @@
 /**
  * UserPsyche Durable Object
  * One per user — persistent psyche at the edge
+ *
+ * Storage strategy: split keys to avoid 128KB limit
+ * - 'meta'           → UserMeta
+ * - 'parts'          → Part[]
+ * - 'session:{id}'   → Session
+ * - 'session_index'  → SessionIndexEntry[]
+ * - 'insights'       → Insight[]
+ * - 'score'          → ScoreHistory
  */
+
+import { getVoiceForArchetype } from '../lib/voices';
+
+interface UserMeta {
+  userId: string;
+  email: string;
+  language: 'en' | 'es';
+  createdAt: string;
+  onboarding: { completed: boolean; currentStep: number };
+}
+
+interface Part {
+  id: string;
+  name: string;
+  archetype: string;
+  voiceId: string;
+  role: string;
+  fear: string;
+  protects: string[];
+  description: string;
+  personality: string;
+  wounds: string[];
+  gifts: string[];
+  dialogueHistory: any[];
+  discoveredAt: string;
+  lastSpokenTo: string;
+  sessionCount: number;
+  unburdened: boolean;
+}
+
+interface SessionIndexEntry {
+  id: string;
+  startedAt: string;
+  primaryPartId: string;
+  duration?: number;
+  summary?: string;
+}
 
 export class UserPsyche {
   private state: DurableObjectState;
   private env: any;
-  private userId: string;
 
   constructor(state: DurableObjectState, env: any) {
     this.state = state;
     this.env = env;
-    this.userId = '';
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -22,35 +65,22 @@ export class UserPsyche {
       return this.handleWebSocketUpgrade(request);
     }
 
-    if (pathname === '/api/init' && request.method === 'POST') {
-      return this.handleInit(request);
-    }
+    // Route handlers
+    if (pathname === '/api/init' && request.method === 'POST') return this.handleInit(request);
+    if (pathname === '/api/meta' && request.method === 'GET') return this.handleGetMeta();
+    if (pathname === '/api/parts' && request.method === 'GET') return this.handleGetParts();
+    if (pathname === '/api/parts' && request.method === 'POST') return this.handleAddPart(request);
+    if (pathname === '/api/language' && request.method === 'PATCH') return this.handleUpdateLanguage(request);
+    if (pathname === '/api/session/start' && request.method === 'POST') return this.handleStartSession(request);
+    if (pathname === '/api/session/end' && request.method === 'POST') return this.handleEndSession(request);
+    if (pathname === '/api/sessions' && request.method === 'GET') return this.handleGetSessions();
+    if (pathname === '/api/insights' && request.method === 'GET') return this.handleGetInsights();
+    if (pathname === '/api/onboarding/complete' && request.method === 'POST') return this.handleCompleteOnboarding();
 
-    if (pathname === '/api/parts' && request.method === 'GET') {
-      return this.handleGetParts();
-    }
-
-    if (pathname === '/api/parts' && request.method === 'POST') {
-      return this.handleAddPart(request);
-    }
-
-    if (pathname === '/api/session/start' && request.method === 'POST') {
-      return this.handleStartSession(request);
-    }
-
-    if (pathname === '/api/session/end' && request.method === 'POST') {
-      return this.handleEndSession(request);
-    }
-
-    if (pathname === '/api/insights' && request.method === 'GET') {
-      return this.handleGetInsights();
-    }
-
-    return new Response(JSON.stringify({ error: 'Not found' }), {
-      status: 404,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return Response.json({ error: 'Not found' }, { status: 404 });
   }
+
+  // ── WebSocket ────────────────────────────────────────────
 
   private async handleWebSocketUpgrade(request: Request): Promise<Response> {
     const pair = new WebSocketPair();
@@ -63,35 +93,26 @@ export class UserPsyche {
         const { type, payload } = message;
 
         switch (type) {
-          case 'start_session':
+          case 'start_session': {
+            const sessionId = crypto.randomUUID();
             server.send(JSON.stringify({
               type: 'session_started',
-              data: { sessionId: crypto.randomUUID() },
+              data: { sessionId },
             }));
             break;
-          case 'send_message':
-            // TODO: Route to Workers AI for part response generation
-            // TODO: Stream TTS via ElevenLabs for part voice
-            server.send(JSON.stringify({
-              type: 'message_received',
-              data: {
-                sessionId: payload.sessionId,
-                partResponse: 'Placeholder — Workers AI response here',
-                timestamp: new Date().toISOString(),
-              },
-            }));
-            break;
-          case 'end_session':
+          }
+          case 'end_session': {
             server.send(JSON.stringify({
               type: 'session_ended',
               data: { sessionId: payload.sessionId, timestamp: new Date().toISOString() },
             }));
             break;
+          }
           default:
-            server.send(JSON.stringify({ error: 'Unknown message type' }));
+            server.send(JSON.stringify({ type: 'error', data: { message: 'Unknown message type' } }));
         }
-      } catch (error) {
-        server.send(JSON.stringify({ error: 'Message handling failed' }));
+      } catch {
+        server.send(JSON.stringify({ type: 'error', data: { message: 'Message handling failed' } }));
       }
     });
 
@@ -101,49 +122,75 @@ export class UserPsyche {
     return new Response(null, { status: 101, webSocket: client });
   }
 
+  // ── Init ─────────────────────────────────────────────────
+
   private async handleInit(request: Request): Promise<Response> {
     const { userId, email } = await request.json() as any;
-    this.userId = userId;
 
-    const existing = await this.state.storage.get('user_psyche');
+    const existing = await this.state.storage.get('meta') as UserMeta | undefined;
     if (existing) {
-      return Response.json({ status: 'already_initialized', user: existing });
+      const parts = await this.state.storage.get('parts') as Part[] || [];
+      return Response.json({ status: 'already_initialized', meta: existing, parts });
     }
 
-    const userPsyche = {
+    const meta: UserMeta = {
       userId,
       email,
+      language: 'en',
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      parts: [],
-      sessions: [],
-      insights: [],
-      selfLeadershipScore: 0,
       onboarding: { completed: false, currentStep: 0 },
     };
 
-    await this.state.storage.put('user_psyche', userPsyche);
-    return Response.json({ status: 'initialized', user: userPsyche });
+    await this.state.storage.put('meta', meta);
+    await this.state.storage.put('parts', []);
+    await this.state.storage.put('session_index', []);
+    await this.state.storage.put('insights', []);
+    await this.state.storage.put('score', { current: 0, history: [] });
+
+    return Response.json({ status: 'initialized', meta, parts: [] });
   }
 
+  // ── Meta ─────────────────────────────────────────────────
+
+  private async handleGetMeta(): Promise<Response> {
+    const meta = await this.state.storage.get('meta') as UserMeta | undefined;
+    if (!meta) return Response.json({ error: 'User not initialized' }, { status: 404 });
+    return Response.json({ meta });
+  }
+
+  // ── Language ─────────────────────────────────────────────
+
+  private async handleUpdateLanguage(request: Request): Promise<Response> {
+    const { language } = await request.json() as { language: 'en' | 'es' };
+    const meta = await this.state.storage.get('meta') as UserMeta | undefined;
+    if (!meta) return Response.json({ error: 'User not initialized' }, { status: 404 });
+
+    meta.language = language;
+    await this.state.storage.put('meta', meta);
+    return Response.json({ meta });
+  }
+
+  // ── Parts ────────────────────────────────────────────────
+
   private async handleGetParts(): Promise<Response> {
-    const data = await this.state.storage.get('user_psyche') as any;
-    if (!data) return Response.json({ error: 'User not initialized' }, { status: 404 });
-    return Response.json({ parts: data.parts || [] });
+    const parts = await this.state.storage.get('parts') as Part[] || [];
+    return Response.json({ parts });
   }
 
   private async handleAddPart(request: Request): Promise<Response> {
-    const { name, archetype, description, personality } = await request.json() as any;
-    const data = await this.state.storage.get('user_psyche') as any;
-    if (!data) return Response.json({ error: 'User not initialized' }, { status: 404 });
+    const { name, archetype, description, personality, role, fear } = await request.json() as any;
+    const parts = await this.state.storage.get('parts') as Part[] || [];
 
-    const newPart = {
+    const newPart: Part = {
       id: crypto.randomUUID(),
       name,
       archetype,
-      voiceId: '', // TODO: Auto-assign from voices.ts mapping
-      description,
-      personality,
+      voiceId: getVoiceForArchetype(archetype),
+      role: role || '',
+      fear: fear || '',
+      protects: [],
+      description: description || '',
+      personality: personality || '',
       wounds: [],
       gifts: [],
       dialogueHistory: [],
@@ -153,56 +200,99 @@ export class UserPsyche {
       unburdened: false,
     };
 
-    data.parts.push(newPart);
-    data.updatedAt = new Date().toISOString();
-    await this.state.storage.put('user_psyche', data);
+    parts.push(newPart);
+    await this.state.storage.put('parts', parts);
 
     return Response.json({ part: newPart }, { status: 201 });
   }
 
-  private async handleStartSession(request: Request): Promise<Response> {
-    const { partIds } = await request.json() as any;
-    const data = await this.state.storage.get('user_psyche') as any;
-    if (!data) return Response.json({ error: 'User not initialized' }, { status: 404 });
+  // ── Sessions ─────────────────────────────────────────────
 
-    const newSession = {
+  private async handleStartSession(request: Request): Promise<Response> {
+    const { primaryPartId } = await request.json() as any;
+    const score = await this.state.storage.get('score') as any || { current: 0, history: [] };
+
+    const session = {
       id: crypto.randomUUID(),
-      userId: this.userId,
-      partIds,
+      primaryPartId,
       startedAt: new Date().toISOString(),
       transcript: [],
-      keyInsights: [],
+      insights: [],
+      selfLeadershipBefore: score.current,
+      selfLeadershipAfter: score.current,
     };
 
-    data.sessions.push(newSession);
-    await this.state.storage.put('user_psyche', data);
-    return Response.json({ session: newSession }, { status: 201 });
+    // Store the session
+    await this.state.storage.put(`session:${session.id}`, session);
+
+    // Update session index
+    const index = await this.state.storage.get('session_index') as SessionIndexEntry[] || [];
+    index.push({
+      id: session.id,
+      startedAt: session.startedAt,
+      primaryPartId,
+    });
+    await this.state.storage.put('session_index', index);
+
+    return Response.json({ session }, { status: 201 });
   }
 
   private async handleEndSession(request: Request): Promise<Response> {
-    const { sessionId } = await request.json() as any;
-    const data = await this.state.storage.get('user_psyche') as any;
-    if (!data) return Response.json({ error: 'User not initialized' }, { status: 404 });
+    const { sessionId, transcript } = await request.json() as any;
 
-    const session = data.sessions.find((s: any) => s.id === sessionId);
+    const session = await this.state.storage.get(`session:${sessionId}`) as any;
     if (!session) return Response.json({ error: 'Session not found' }, { status: 404 });
 
     session.endedAt = new Date().toISOString();
     session.duration = Math.round(
       (new Date(session.endedAt).getTime() - new Date(session.startedAt).getTime()) / 1000
     );
-    data.updatedAt = new Date().toISOString();
+    if (transcript) {
+      session.transcript = transcript;
+    }
 
-    // TODO: Generate session summary via Workers AI
-    // TODO: Extract insights and embed via Vectorize
+    await this.state.storage.put(`session:${sessionId}`, session);
 
-    await this.state.storage.put('user_psyche', data);
+    // Update session index with duration
+    const index = await this.state.storage.get('session_index') as SessionIndexEntry[] || [];
+    const entry = index.find((e: SessionIndexEntry) => e.id === sessionId);
+    if (entry) {
+      entry.duration = session.duration;
+      await this.state.storage.put('session_index', index);
+    }
+
+    // Increment part's session count
+    const parts = await this.state.storage.get('parts') as Part[] || [];
+    const part = parts.find(p => p.id === session.primaryPartId);
+    if (part) {
+      part.sessionCount++;
+      part.lastSpokenTo = new Date().toISOString();
+      await this.state.storage.put('parts', parts);
+    }
+
     return Response.json({ session });
   }
 
+  private async handleGetSessions(): Promise<Response> {
+    const index = await this.state.storage.get('session_index') as SessionIndexEntry[] || [];
+    return Response.json({ sessions: index });
+  }
+
+  // ── Insights ─────────────────────────────────────────────
+
   private async handleGetInsights(): Promise<Response> {
-    const data = await this.state.storage.get('user_psyche') as any;
-    if (!data) return Response.json({ error: 'User not initialized' }, { status: 404 });
-    return Response.json({ insights: data.insights || [] });
+    const insights = await this.state.storage.get('insights') || [];
+    return Response.json({ insights });
+  }
+
+  // ── Onboarding ───────────────────────────────────────────
+
+  private async handleCompleteOnboarding(): Promise<Response> {
+    const meta = await this.state.storage.get('meta') as UserMeta | undefined;
+    if (!meta) return Response.json({ error: 'User not initialized' }, { status: 404 });
+
+    meta.onboarding.completed = true;
+    await this.state.storage.put('meta', meta);
+    return Response.json({ meta });
   }
 }

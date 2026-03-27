@@ -53,17 +53,21 @@ Post-hackathon: multi-part sessions where protectors can interrupt and exiles ca
 
 ```
 Frontend        Next.js 15 (App Router, TypeScript) + Tailwind CSS
-Animations      Framer Motion (orbital parts map, spring physics, gestures)
+3D Map          react-three-fiber + @react-three/drei + @react-three/postprocessing (Three.js)
+UI Animations   Framer Motion (page transitions, panels, onboarding — NOT the 3D map)
 Auth            Auth.js (NextAuth) — Sign in with Google → JWT
 Edge Runtime    Cloudflare Workers (auth validation, routing, WebSocket upgrade)
-State           Cloudflare Durable Objects (1 per user — persistent psyche)
-Vector Search   Cloudflare Vectorize (semantic memory over session history)
-AI Inference    Cloudflare Workers AI (pattern detection, insight generation)
-Voice Agent     ElevenLabs Conversational AI (real-time facilitator voice)
-Part Voices     ElevenLabs TTS (unique pre-assigned voice per part)
+State           Cloudflare Durable Objects (1 per user — persistent psyche, split-key storage)
+AI Inference    Cloudflare Workers AI (session summaries, insight generation)
+Voice Agent     ElevenLabs Conversational AI (multi-voice: facilitator + parts in one agent)
+Language        English + Spanish (ElevenLabs multilingual models + language detection tool)
+State Mgmt      Zustand (client-side state)
 Deployment      Cloudflare Pages (frontend) + Workers (backend)
 Repo            github.com/galborta/Parts
 ```
+
+**Removed from MVP:** Vectorize (post-MVP), separate ElevenLabs TTS (replaced by native multi-voice)
+**Added:** react-three-fiber, Zustand, English/Spanish language support
 
 ---
 
@@ -74,6 +78,14 @@ Browser (Next.js on CF Pages)
     │
     ├── Auth: Sign in with Google (Auth.js → JWT)
     │
+    ├── Language Selection: English / Spanish (stored in DO, sent to ElevenLabs)
+    │
+    ├── ElevenLabs Conversational AI (multi-voice agent, runs in browser)
+    │   ├── Default voice = Facilitator (warm, calm, guides)
+    │   ├── Additional voices = Parts (up to 9, one per archetype)
+    │   ├── Voice switching via XML tags: <InnerCritic>text</InnerCritic>
+    │   └── Language detection tool for mid-session EN↔ES switching
+    │
     ├── WebSocket connection to CF Worker
     │       │
     │       ▼
@@ -81,21 +93,21 @@ Browser (Next.js on CF Pages)
     │       │
     │       ▼
     │   Durable Object (1 per user — THE persistent psyche)
-    │   ├── parts[ ] — name, voiceId, role, fear, dialogue history
-    │   ├── sessions[ ] — transcripts, insights, timestamps
-    │   ├── relationships — which parts protect which exiles
-    │   └── selfLeadershipScore — the measurable north star
+    │   ├── meta — profile, language, onboarding state
+    │   ├── parts — name, voiceId, role, fear, archetype
+    │   ├── session:{id} — one key per session transcript (avoids 128KB limit)
+    │   ├── session_index — lightweight session list for UI
+    │   ├── insights — aggregated cross-session insights
+    │   └── score — selfLeadershipScore history
     │       │
-    │       ├── → Vectorize (embed session transcripts, retrieve on next session)
-    │       ├── → Workers AI (pattern detection: "You've mentioned your father 9 times across 3 parts")
-    │       ├── → ElevenLabs Conversational AI (facilitator voice, real-time dialogue)
-    │       └── → ElevenLabs TTS (part voices — unique per part, streamed)
+    │       └── → Workers AI (session summaries, insight generation)
     │
-    └── Parts Map UI (Framer Motion orbital visualization)
-        ├── Clickable orbs for each part
-        ├── Relationship lines between parts
+    └── Parts Map UI (react-three-fiber 3D visualization)
+        ├── Glowing 3D spheres for each part (bloom post-processing)
+        ├── Luminous threads between related parts
         ├── Self node at center (grows as Self-leadership increases)
-        └── Insight badges on new discoveries
+        ├── OrbitControls for rotation/zoom
+        └── Particle field background for depth
 ```
 
 ### The Architecture Insight for Judges
@@ -110,19 +122,32 @@ One Durable Object per user IS the IFS model in code. The user's psyche is a per
 
 When you're talking to the facilitator and ask to speak with a part, the voice must change noticeably and immediately. That moment of hearing a different voice speak as your inner critic is the entire product in 2 seconds.
 
-### Implementation: Facilitator = Conversational AI, Parts = TTS Streaming
+### Implementation: Native Multi-Voice Conversational AI
 
-- **Facilitator:** ElevenLabs Conversational AI agent. Warm, calm, guides the session. Always the same voice. This is a real-time conversational agent — it listens, responds, adapts.
+ElevenLabs Conversational AI supports up to **10 voices per agent** with XML-style switching tags. This eliminates the complex "pause ConvAI → TTS → resume" choreography entirely.
 
-- **Parts:** ElevenLabs TTS streaming. When the facilitator "hands off" to a part, the Durable Object generates the part's response (via Workers AI, using the part's personality profile and dialogue history), then streams it as speech using that part's assigned ElevenLabs voice ID.
+- **Single agent, single WebSocket session** — facilitator AND all parts run through one Conversational AI agent
+- **Default voice** = Facilitator (warm, calm, guides the session)
+- **Additional voices** (up to 9) = user's parts, one per archetype
+- **Voice switching** via XML tags in agent output: `<InnerCritic>Because if I don't push you, you get complacent.</InnerCritic>`
+- **The agent's system prompt** contains IFS facilitation logic, the user's known parts with their personalities/wounds/gifts, and instructions for when to switch voices
+- **No separate TTS calls**, no WebSocket juggling, no pause/resume choreography
+- **Multilingual voices** support both English and Spanish natively via Flash v2.5 / Multilingual v2 models
+- **Language detection system tool** (added March 2025) enables mid-conversation EN↔ES switching
 
-- **The switch:** User speaks → audio goes to Conversational AI facilitator → facilitator decides it's time to let the part speak → sends signal to client → client pauses Conversational AI → Durable Object generates part response → TTS streams the response in the part's voice → part finishes → Conversational AI resumes.
+### The Switch Flow (Simplified)
 
-This is simpler than running multiple Conversational AI agents and avoids the WebSocket-switching complexity.
+```
+User speaks → ElevenLabs agent receives audio → Agent decides whether to respond as
+facilitator or as a part → If part: wraps response in <PartName> XML tags →
+ElevenLabs automatically switches to that part's voice → User hears the part speak
+```
+
+Zero client-side orchestration needed for voice switching. The agent handles it all.
 
 ### 6 Preset Part Voices (Hackathon)
 
-Pick 6 archetypal voices from ElevenLabs' voice library. Don't do custom cloning for the hackathon.
+Pick 6 archetypal **multilingual** voices from ElevenLabs' voice library that sound natural in both English and Spanish. Don't do custom cloning for the hackathon.
 
 | Archetype | Voice Character | Example Voice |
 |-----------|----------------|---------------|
@@ -132,6 +157,8 @@ Pick 6 archetypal voices from ElevenLabs' voice library. Don't do custom cloning
 | Protector | Strong, firm, defensive | Deep male, commanding |
 | Pleaser | Warm, eager, slightly desperate | Female, bright, accommodating |
 | Exile (wounded) | Quiet, fragile, hesitant | Whispered, slow, trembling |
+
+**Voice budget:** 1 facilitator + 6 archetypes = 7 voices. Well within the 10-voice limit. Use multilingual voices so the same voice handles both EN and ES — no need for per-language duplicates.
 
 Users can reassign voices to their parts later. For hackathon, auto-assign based on the archetype the user picks or the AI infers.
 
@@ -167,6 +194,7 @@ Users can reassign voices to their parts later. For hackathon, auto-assign based
 interface UserPsyche {
   userId: string;              // Google OAuth ID
   email: string;
+  language: 'en' | 'es';      // User's chosen language
   createdAt: string;
 
   parts: Part[];
@@ -179,6 +207,14 @@ interface UserPsyche {
     currentStep: number;
   };
 }
+
+// DO Storage Strategy: split into separate keys to avoid 128KB limit
+// 'meta'           → { userId, email, language, onboarding, createdAt }
+// 'parts'          → Part[]
+// 'session:{id}'   → Session (one key per session)
+// 'session_index'  → { id, startedAt, primaryPartId, duration }[]
+// 'insights'       → Insight[]
+// 'score'          → { current: number, history: { date, score }[] }
 
 interface Part {
   id: string;
@@ -239,35 +275,48 @@ interface TranscriptEntry {
 
 ## Parts Map UI (The Viral Visual)
 
-### Core: Framer Motion Orbital Visualization
+### Core: react-three-fiber 3D Visualization
 
-- Parts rendered as **softly glowing orbs** in orbital layout around a central **Self** node
-- Each part-orb has a color based on archetype (warm = protectors, cool = exiles, neutral = managers)
-- **Relationship lines** draw themselves between connected parts (protector → exile)
+- Parts rendered as **softly glowing 3D spheres** floating in space around a central **Self** node
+- **Bloom post-processing** for the glow effect (via @react-three/postprocessing EffectComposer)
+- **OrbitControls** for user rotation/zoom (drei)
+- **MeshDistortMaterial** on Self node for organic, living appearance
+- Each part-orb colored by archetype: warm oranges/reds = protectors, cool blues = exiles, neutral = managers
+- **Luminous threads** (animated line geometry) connecting related parts (protector → exile)
+- **Particle field** background for depth and atmosphere
 - **Self node grows** as selfLeadershipScore increases
-- Tap a part to see its profile, history, start a session with it
-- New parts animate in with spring physics
-- Insight badges pulse on orbs when new pattern detected
+- Hover: orb scales up, name label appears (drei Html/Text)
+- Click: opens part detail panel, can start session
+- **Golden-angle spiral** positioning for aesthetic orbital layout
+- New parts animate in with spring-like interpolation via useFrame
 
-### Animation Library
+### Animation Libraries
 
 ```
-framer-motion for:
-  - Orbital layout with spring physics
-  - AnimatePresence for adding/removing parts
-  - Drag gestures (users can rearrange their map)
-  - layoutId for smooth transitions between map view and part detail
-  - Animated relationship lines (SVG path drawing)
+react-three-fiber for:
+  - 3D scene rendering (Canvas, useFrame, useThree)
+  - Orbital sphere layout with smooth floating animation
+  - Bloom glow post-processing
+  - Interactive 3D controls (OrbitControls)
+  - Hover/click interactions on 3D objects
+
+framer-motion for (UI only, NOT the 3D map):
+  - Page transitions and route animations
+  - Panel slide-ins (part detail, session view)
+  - Onboarding flow step transitions
+  - Button hover/tap animations
+  - AnimatePresence for modal/overlay entrances
 ```
 
 ### Visual Targets for Video
 
-The parts map is what people screenshot and share. It must look beautiful:
-- Dark background, glowing orbs with soft shadows
-- Smooth orbital motion (not jerky)
-- Lines that draw themselves when relationships are discovered
-- Insight badges that pulse with a gentle glow
-- Self node at center with a distinct radiance
+The parts map is what people screenshot and share. It must look stunning in 3D:
+- Dark background, glowing spheres with bloom post-processing
+- Slow orbital floating motion (sine wave via useFrame)
+- Luminous threads that animate between connected parts
+- Particle field giving depth and a "floating in your psyche" feeling
+- Self node at center with distinct radiance (MeshDistortMaterial + emissive)
+- Smooth camera orbit on idle for cinematic video footage
 
 ---
 
@@ -279,7 +328,6 @@ The parts map is what people screenshot and share. It must look beautiful:
 /api/session/end           End session (triggers summary, insight generation)
 /api/parts                 GET: list user's parts. POST: create new part
 /api/parts/[id]            GET: part detail. PATCH: update part
-/api/parts/[id]/speak      POST: generate part's TTS response (via DO → Workers AI → ElevenLabs TTS)
 /api/insights              GET: user's insights
 /api/ws                    WebSocket upgrade → CF Worker → Durable Object
 ```
@@ -320,36 +368,23 @@ NEXT_PUBLIC_APP_URL=https://parts.app
 
 ## Build Order — What to Ship First
 
-1. **CLAUDE.md written** ← this file. Do this before any code.
+### Phase 1: Auth + Storage Foundation (45 min)
+Auth.js Google OAuth, JWT strategy, DO split-key storage restructure, worker JWT validation, client helpers.
 
-2. **GitHub repo initialized, .env.example, wrangler.toml** (15 min)
+### Phase 2: Language Selection + Onboarding (30 min)
+EN/ES picker, i18n dictionary, onboarding flow (language → IFS intro → name first part → map), dashboard page with auth guard.
 
-3. **Durable Object schema: user → parts[] → sessions[]** (30 min)
-   The data model IS the psychology model. Get this right first.
+### Phase 3: ElevenLabs Multi-Voice Agent (60 min) — **← CORE WOW**
+Replace placeholder voice IDs, build agent config with IFS system prompt + XML voice tags, SessionView with `@11labs/react` useConversation hook, VoiceOrb audio-reactive animation, live transcript, Zustand state management.
 
-4. **Worker that creates a DO per user and persists a part** (30 min)
+### Phase 4: 3D Parts Map (90 min) — **← WHAT GOES VIRAL**
+react-three-fiber Canvas with bloom post-processing, SelfNode with MeshDistortMaterial, PartOrb spheres with archetype colors, RelationshipThreads luminous lines, ParticleField background, golden-angle spiral layout, PartDetailPanel slide-in.
 
-5. **Auth layer: Sign in with Google via Auth.js** (45 min)
+### Phase 5: Integration + State Flow (45 min)
+Wire map → detail → session → map update flow, session persistence to DO, insight generation, self-leadership score computation and display.
 
-6. **ElevenLabs Conversational AI session — facilitator voice live** (30 min)
-   **← CORE WOW**
-
-7. **Part voice assignment — create a part, assign an ElevenLabs voice ID** (20 min)
-
-8. **Voice switching — facilitator → part → facilitator** (60 min)
-   The technical crux. Session passes context about which part is "speaking" and ElevenLabs switches voice.
-
-9. **Parts map UI — orbital/node visualization, parts as clickable orbs** (90 min)
-   **← WHAT GOES VIRAL**
-
-10. **Vectorize integration — embed session transcript, retrieve on next session** (45 min)
-
-11. **Insight surfacing — "You've mentioned your father 9 times across 3 parts"** (30 min)
-
-12. **Self-leadership score — simple metric, visible in UI** (20 min)
-
-13. **Deploy to Cloudflare Workers + Pages via Wrangler** (30 min)
-    **← LIVE URL FOR JUDGES**
+### Phase 6: Ethics + Polish + Deploy (30 min) — **← LIVE URL FOR JUDGES**
+Crisis detection (988 Lifeline modal), therapy disclaimer, deploy CF Pages + Workers.
 
 ---
 
@@ -465,23 +500,33 @@ Parts/
 │       └── insights/route.ts          # GET user insights
 │
 ├── components/
-│   ├── PartsMap.tsx                   # Orbital visualization (Framer Motion)
-│   ├── PartOrb.tsx                    # Individual part node
-│   ├── RelationshipLine.tsx           # Animated SVG connections
-│   ├── SelfNode.tsx                   # Central Self indicator
-│   ├── SessionView.tsx               # Active session UI
-│   ├── FacilitatorPanel.tsx           # Facilitator voice + controls
+│   ├── three/                         # 3D visualization (react-three-fiber)
+│   │   ├── PartsMap3D.tsx             # Canvas + EffectComposer + Bloom + OrbitControls
+│   │   ├── SelfNode.tsx               # Central Self sphere (MeshDistortMaterial)
+│   │   ├── PartOrb.tsx                # Individual part sphere
+│   │   ├── RelationshipThreads.tsx    # Luminous animated connections
+│   │   └── ParticleField.tsx          # Background particles for depth
+│   ├── providers/
+│   │   └── AuthProvider.tsx           # Auth.js SessionProvider wrapper
+│   ├── SessionView.tsx               # Active voice session UI
+│   ├── VoiceOrb.tsx                  # Audio-reactive pulse animation
 │   ├── TranscriptView.tsx            # Live session transcript
-│   ├── InsightBadge.tsx              # Pulsing insight notification
-│   ├── AuthButton.tsx                # Sign in with Google
-│   └── OnboardingFlow.tsx            # Guided first session
+│   ├── PartDetailPanel.tsx           # Part info slide-in panel
+│   ├── LanguageSelector.tsx          # EN/ES language picker
+│   ├── OnboardingFlow.tsx            # Guided first session
+│   ├── CrisisDetection.tsx           # Crisis keyword detection + resources
+│   ├── Disclaimer.tsx                # Therapy disclaimer
+│   └── SelfLeadershipScore.tsx       # Progress metric display
 │
 ├── lib/
 │   ├── types.ts                       # TypeScript interfaces (from data model above)
-│   ├── elevenlabs.ts                  # ElevenLabs Conversational AI + TTS helpers
+│   ├── elevenlabs.ts                  # ElevenLabs multi-voice agent config builder
 │   ├── auth.ts                        # Auth.js configuration
 │   ├── cloudflare.ts                  # DO client helpers
-│   └── voices.ts                      # Voice ID mappings for archetypes
+│   ├── voices.ts                      # Voice ID mappings for archetypes (multilingual)
+│   ├── i18n.ts                        # EN/ES string dictionary
+│   ├── orbital.ts                     # Golden-angle spiral 3D positioning math
+│   └── store.ts                       # Zustand state stores
 │
 ├── worker/                            # Cloudflare Worker
 │   ├── index.ts                       # Main worker: auth, routing, WebSocket
@@ -516,5 +561,5 @@ The voice switch. When you're talking to the facilitator and then ask to speak w
 ---
 
 **Last Updated:** March 27, 2026
-**Status:** Architecture defined — ready to build
+**Status:** Architecture updated — r3f 3D map, multi-voice ElevenLabs, EN/ES, split-key DO storage. Ready to build.
 **Deadline:** ~6 days (ElevenHacks #2 submission)

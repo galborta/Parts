@@ -1,51 +1,137 @@
-# Parts — Talk to Your Inner Parts. Hear Them Talk Back.
+# Parts — One voice. One question. It gets to know you.
 
 ## What This Is
 
-Parts is an IFS (Internal Family Systems) therapy companion that gives each of your inner parts its own distinct AI voice. You speak to a warm facilitator, identify a part (your Inner Critic, your Perfectionist, your Inner Child), and then *hear that part speak back to you* in its own unique voice via ElevenLabs.
+Parts is a voice AI for self-knowledge. Every day, one voice asks you one question. The question is never random — it's the next right move in a structured psychological progression based on your history. The more you use it, the more precisely it knows where to aim.
 
-Every session is stored in a Cloudflare Durable Object — one per user, persistent forever. Your parts map grows richer over time. The app tracks relationships between parts, surfaces cross-session insights, and measures your progress toward Self-leadership (the IFS north star).
+It gets harder over time. It gets more personal over time. That's the product.
 
 **Built for ElevenHacks #2: Cloudflare × ElevenLabs**
 
 ---
 
-## The IFS Science
+## The Core Experience
 
-Internal Family Systems was developed by Dr. Richard Schwartz, is listed by SAMHSA as an evidence-based practice, is used in PTSD treatment at the VA, and is taught at Harvard Medical School.
+One screen. One orb. One voice.
 
-Three core claims:
+The voice asks a question. You answer out loud. The voice reflects what it heard in one sentence. Then it closes: *"Let that sit."*
 
-1. **The mind is naturally multiple.** You've experienced this — part of you wants to quit, part of you is afraid to. IFS says these are distinct sub-personalities with their own histories, fears, and intentions.
+That's a session. 3–5 minutes. Done.
 
-2. **Every part has a positive intention.** Your inner critic isn't evil — it's trying to protect you from failure or rejection. It's a *protector*.
+The next session knows everything you said in every previous session. The questions build. After 10 sessions it starts naming patterns you haven't named yourself. After 30 sessions, it knows you.
 
-3. **Beneath all parts is Self** — calm, curious, compassionate, clear. The therapeutic north is reaching Self-leadership: when you can sit with any part and feel genuinely curious about it instead of fused with it or overwhelmed by it.
+---
 
-### How an IFS Session Actually Works
+## The Scientific Method (Why This Isn't Just a Journaling App)
 
-This matters for the architecture:
+Two evidence-based frameworks, combined:
 
-- A session typically focuses on **one primary part**, but others may surface
-- The therapist (our facilitator) helps you **locate** the part — where do you feel it in your body?
-- You **turn toward** the part and notice what it looks like, what it's feeling
-- You **dialogue** with it — "What are you afraid of?" "What do you need from me?"
-- The part responds through feelings, images, or internal voice
-- Other parts may **interrupt** — a protector might step in when you get close to an exile
-- The goal each session: get **Self** into relationship with the part. Even 30 seconds of genuine curiosity toward a part is therapeutic progress.
+### Motivational Interviewing (MI)
+Developed by Miller & Rollnick. Hundreds of RCTs. The core insight: people don't change because someone told them to. They change when they hear themselves articulate their own reasons. The AI's job is to ask questions that draw out *your own* change talk — never to advise, diagnose, or instruct.
 
-### Session Model for MVP
+MI has a staged progression. The AI tracks which stage each user is in and generates questions accordingly.
 
-For the hackathon, each session focuses on **one part at a time**:
+### ACT — Acceptance & Commitment Therapy
+The most evidence-based therapy of the last 20 years (SAMHSA listed). Its north star is **psychological flexibility** — the ability to be present, open, and do what matters even when it's hard.
+
+ACT defines 6 measurable dimensions. The AI tracks all of them in the Durable Object and targets whichever is most neglected.
+
+---
+
+## The 4 Stages (MI)
+
+The Durable Object tracks the user's current stage. Stage advances when behavioral thresholds are met (N sessions, engagement quality, pattern detection).
+
+### Stage 1: Engage (Sessions 1–7)
+Build safety. Ask about what's present. Learn the user's vocabulary and emotional register. Never probe — observe. Questions feel like a curious, unhurried friend.
+
+> *"What's been taking up the most space in your mind lately?"*
+> *"When you imagine feeling more at ease, what's the first thing that shifts?"*
+
+### Stage 2: Focus (Sessions 8–20)
+The AI has enough data. Start referencing what the user has actually said. Questions begin to feel targeted — slightly uncomfortable. They name patterns the user hasn't named.
+
+> *"You've mentioned your work three times and never said what you actually want from it. What do you want?"*
+> *"Last week you used the word 'trapped'. What would 'free' look like on a specific Tuesday morning?"*
+
+### Stage 3: Evoke (Sessions 21–40)
+The heart of MI. Ask questions designed to surface the user's own motivation for change — not motivation the AI provides. Listen for change talk. Target the gap between stated values and current life.
+
+> *"If nothing changes in the next two years, what does that cost you?"*
+> *"You've described what you're afraid of. What do you want instead — not the absence of fear, the actual thing you want?"*
+
+### Stage 4: Integrate (Sessions 40+)
+The user becomes the witness of their own growth. Questions invite them to look back, notice who they've become, consolidate what's changed.
+
+> *"How is the way you're answering today different from how you would have answered three months ago?"*
+> *"What do you know now that you wish you'd known when you started?"*
+
+---
+
+## The 6 ACT Dimensions (Tracked in DO)
+
+The AI tracks engagement across all 6 dimensions. Whichever is most neglected across recent sessions gets targeted next.
+
+| Dimension | Question Flavor |
+|-----------|----------------|
+| **Present moment** | Are you here or lost in past/future? |
+| **Acceptance** | What are you avoiding feeling? |
+| **Defusion** | Are you fused with a story about yourself? |
+| **Self-as-context** | Who's watching all of this? |
+| **Values clarity** | What actually matters to you? |
+| **Committed action** | What are you actually doing about it? |
+
+---
+
+## How Each Question Is Generated
+
+This is the algorithm. Every question is the result of this exact process — nothing is random.
 
 ```
-Facilitator guides → User identifies/names a part → Voice switches to that part →
-User dialogues with part → Facilitator returns to process → Session summary
+1. Load DO: retrieve session history, detected patterns, current MI stage,
+   ACT dimension scores, last 5 session summaries.
+
+2. Find neglected ACT dimension: which of the 6 has been least addressed
+   in the last 5 sessions?
+
+3. Select question type: based on current MI stage, pick the appropriate
+   question archetype (open question, values clarification, change talk evocation,
+   forward projection, retrospective reflection, etc.)
+
+4. Retrieve emotional anchors: 3 most emotionally significant phrases the
+   user has said across all sessions (stored in DO as extracted patterns).
+
+5. Generate the question:
+   - Targets the neglected ACT dimension
+   - Uses the right question type for the current stage
+   - References something they actually said, if relevant
+   - Is specific, not vague
+   - Is under 25 words
+   - Contains no advice, interpretation, or judgment
+   - Should feel slightly uncomfortable — precise enough to land
+
+6. The session:
+   User answers (voice) →
+   AI reflects in ≤15 words ("So what you're noticing is...") →
+   One follow-up question OR closes: "Let that sit." →
+   Session ends.
+
+7. Post-session (Worker):
+   - Transcribe and store full session in DO
+   - Workers AI scores answer across 6 ACT dimensions
+   - Extract new emotional patterns and recurring themes
+   - Update stage if advancement thresholds met
+   - Generate session summary (2–3 sentences, stored in DO)
+   - Surface insight if new cross-session pattern detected
 ```
 
-Each part keeps the **same voice across all sessions** (your Inner Critic always sounds the same). This builds familiarity and emotional continuity — exactly like how in real IFS, parts develop a consistent "character" over time.
+---
 
-Post-hackathon: multi-part sessions where protectors can interrupt and exiles can emerge organically.
+## The North Star
+
+**Psychological flexibility** — ACT's measurable outcome. The user moves from being run by automatic patterns toward choosing how they respond to their inner experience. Measurable across the 6 dimensions. Visible in how they answer questions over time.
+
+The app never tells the user they've achieved this. They notice it themselves when they answer a question and realize they would have answered it completely differently three months ago. That's the moment. That's the product.
 
 ---
 
@@ -53,21 +139,18 @@ Post-hackathon: multi-part sessions where protectors can interrupt and exiles ca
 
 ```
 Frontend        Next.js 15 (App Router, TypeScript) + Tailwind CSS
-3D Map          react-three-fiber + @react-three/drei + @react-three/postprocessing (Three.js)
-UI Animations   Framer Motion (page transitions, panels, onboarding — NOT the 3D map)
+Animations      Framer Motion — ALL animations (page transitions, orb, session view)
 Auth            Auth.js (NextAuth) — Sign in with Google → JWT
-Edge Runtime    Cloudflare Workers (auth validation, routing, WebSocket upgrade)
-State           Cloudflare Durable Objects (1 per user — persistent psyche, split-key storage)
-AI Inference    Cloudflare Workers AI (session summaries, insight generation)
-Voice Agent     ElevenLabs Conversational AI (multi-voice: facilitator + parts in one agent)
-Language        English + Spanish (ElevenLabs multilingual models + language detection tool)
-State Mgmt      Zustand (client-side state)
-Deployment      Cloudflare Pages (frontend) + Workers (backend)
-Repo            github.com/galborta/Parts
+Edge Runtime    Cloudflare Workers (auth validation, routing, REST proxy to DO)
+State           Cloudflare Durable Objects (1 per user — the user's entire psychological history)
+AI Inference    Workers AI (question generation, session scoring, pattern extraction, summaries)
+Voice           ElevenLabs Conversational AI — ONE voice, one agent, consistent across all sessions
+Deployment      Cloudflare Pages (frontend) + Workers (backend + DO)
 ```
 
-**Removed from MVP:** Vectorize (post-MVP), separate ElevenLabs TTS (replaced by native multi-voice)
-**Added:** react-three-fiber, Zustand, English/Spanish language support
+**No Three.js / react-three-fiber.** All visuals are Framer Motion.
+**No multiple voices.** One voice, always. The consistency IS the relationship.
+**Progress lives in Durable Object.** Not localStorage. The DO is the source of truth.
 
 ---
 
@@ -76,269 +159,341 @@ Repo            github.com/galborta/Parts
 ```
 Browser (Next.js on CF Pages)
     │
-    ├── Auth: Sign in with Google (Auth.js → JWT)
+    ├── Auth: Sign in with Google (Auth.js → JWT in httpOnly cookie)
     │
-    ├── Language Selection: English / Spanish (stored in DO, sent to ElevenLabs)
+    ├── ElevenLabs Conversational AI (one agent, one voice, runs in browser)
+    │   ├── System prompt injected at session start:
+    │   │   - Current MI stage
+    │   │   - Today's pre-generated question
+    │   │   - Last 3 session summaries
+    │   │   - Detected emotional patterns
+    │   │   - User's name
+    │   │   - Behavioral constraints (no advice, no diagnosis, reflect then close)
+    │   └── Session ends → transcript sent to Worker
     │
-    ├── ElevenLabs Conversational AI (multi-voice agent, runs in browser)
-    │   ├── Default voice = Facilitator (warm, calm, guides)
-    │   ├── Additional voices = Parts (up to 9, one per archetype)
-    │   ├── Voice switching via XML tags: <InnerCritic>text</InnerCritic>
-    │   └── Language detection tool for mid-session EN↔ES switching
-    │
-    ├── WebSocket connection to CF Worker
+    ├── REST API calls → CF Worker
     │       │
     │       ▼
     │   CF Worker validates JWT, routes to user's Durable Object
     │       │
     │       ▼
-    │   Durable Object (1 per user — THE persistent psyche)
-    │   ├── meta — profile, language, onboarding state
-    │   ├── parts — name, voiceId, role, fear, archetype
-    │   ├── session:{id} — one key per session transcript (avoids 128KB limit)
-    │   ├── session_index — lightweight session list for UI
-    │   ├── insights — aggregated cross-session insights
-    │   └── score — selfLeadershipScore history
+    │   Durable Object (1 per user — everything, forever)
+    │   ├── meta           → UserMeta (stage, dimensions, language, onboarding)
+    │   ├── parts          → (legacy: Part[] for IFS-adjacent features, not core to MVP)
+    │   ├── session_index  → SessionIndexEntry[] (lightweight list)
+    │   ├── session:{id}   → full session (transcript, scores, summary)
+    │   ├── patterns       → ExtractedPattern[] (recurring themes, phrases)
+    │   ├── insights       → Insight[] (cross-session observations)
+    │   └── score          → { dimensions: DimensionScores, history: [] }
     │       │
-    │       └── → Workers AI (session summaries, insight generation)
+    │       └── Workers AI:
+    │           ├── /generate-question  (called before session, result cached in DO)
+    │           ├── /score-session      (called after session ends)
+    │           ├── /extract-patterns   (called after every 3rd session)
+    │           └── /generate-insight   (called when new pattern threshold crossed)
     │
-    └── Parts Map UI (react-three-fiber 3D visualization)
-        ├── Glowing 3D spheres for each part (bloom post-processing)
-        ├── Luminous threads between related parts
-        ├── Self node at center (grows as Self-leadership increases)
-        ├── OrbitControls for rotation/zoom
-        └── Particle field background for depth
+    └── UI (Framer Motion)
+        ├── Landing page
+        ├── Onboarding (3 steps)
+        ├── Dashboard (session history, dimension scores, streak)
+        ├── Session view (orb + voice + transcript)
+        └── Insight view (pattern surfacing)
 ```
-
-### The Architecture Insight for Judges
-
-One Durable Object per user IS the IFS model in code. The user's psyche is a persistent, stateful, always-addressable entity at the edge. It holds their parts, remembers every conversation, and is alive forever. That's not a metaphor — it's genuinely the right primitive for this problem.
 
 ---
 
-## Voice Architecture (The Key Technical Decision)
-
-### The Voice Switch — This Is the Entire Product
-
-When you're talking to the facilitator and ask to speak with a part, the voice must change noticeably and immediately. That moment of hearing a different voice speak as your inner critic is the entire product in 2 seconds.
-
-### Implementation: Native Multi-Voice Conversational AI
-
-ElevenLabs Conversational AI supports up to **10 voices per agent** with XML-style switching tags. This eliminates the complex "pause ConvAI → TTS → resume" choreography entirely.
-
-- **Single agent, single WebSocket session** — facilitator AND all parts run through one Conversational AI agent
-- **Default voice** = Facilitator (warm, calm, guides the session)
-- **Additional voices** (up to 9) = user's parts, one per archetype
-- **Voice switching** via XML tags in agent output: `<InnerCritic>Because if I don't push you, you get complacent.</InnerCritic>`
-- **The agent's system prompt** contains IFS facilitation logic, the user's known parts with their personalities/wounds/gifts, and instructions for when to switch voices
-- **No separate TTS calls**, no WebSocket juggling, no pause/resume choreography
-- **Multilingual voices** support both English and Spanish natively via Flash v2.5 / Multilingual v2 models
-- **Language detection system tool** (added March 2025) enables mid-conversation EN↔ES switching
-
-### The Switch Flow (Simplified)
-
-```
-User speaks → ElevenLabs agent receives audio → Agent decides whether to respond as
-facilitator or as a part → If part: wraps response in <PartName> XML tags →
-ElevenLabs automatically switches to that part's voice → User hears the part speak
-```
-
-Zero client-side orchestration needed for voice switching. The agent handles it all.
-
-### 6 Preset Part Voices (Hackathon)
-
-Pick 6 archetypal **multilingual** voices from ElevenLabs' voice library that sound natural in both English and Spanish. Don't do custom cloning for the hackathon.
-
-| Archetype | Voice Character | Example Voice |
-|-----------|----------------|---------------|
-| Inner Critic | Clipped, precise, slightly cold | Male, mature, authoritative |
-| Perfectionist | Fast, anxious, detail-oriented | Female, sharp, energetic |
-| Inner Child | Soft, small, vulnerable | Young-sounding, gentle |
-| Protector | Strong, firm, defensive | Deep male, commanding |
-| Pleaser | Warm, eager, slightly desperate | Female, bright, accommodating |
-| Exile (wounded) | Quiet, fragile, hesitant | Whispered, slow, trembling |
-
-**Voice budget:** 1 facilitator + 6 archetypes = 7 voices. Well within the 10-voice limit. Use multilingual voices so the same voice handles both EN and ES — no need for per-language duplicates.
-
-Users can reassign voices to their parts later. For hackathon, auto-assign based on the archetype the user picks or the AI infers.
-
----
-
-## Authentication
-
-### Flow
-
-```
-1. User lands on parts.app → sees landing page
-2. Clicks "Sign in with Google" → Auth.js handles OAuth2 flow
-3. Auth.js creates session → generates JWT with user's Google ID + email
-4. JWT stored in httpOnly cookie
-5. On WebSocket connect: CF Worker reads JWT from cookie, validates signature
-6. Worker routes to Durable Object named by Google ID (deterministic: same user = same DO)
-7. First visit: DO initializes empty parts map + onboarding state
-8. Return visit: DO loads existing parts, session history, insights
-```
-
-### Why Google Auth Matters
-
-- Durable Object ID is derived from Google account → your psyche is uniquely yours
-- No anonymous usage (protects against abuse, required for persistent state)
-- Email available for therapist sharing feature ($49/mo tier)
-- Simple, trusted, one-click
-
----
-
-## Data Model (Durable Object State)
+## Data Model
 
 ```typescript
-interface UserPsyche {
-  userId: string;              // Google OAuth ID
+// DO Storage: split keys to avoid 128KB limit per value
+// 'meta'           → UserMeta
+// 'session_index'  → SessionIndexEntry[]
+// 'session:{id}'   → Session
+// 'patterns'       → ExtractedPattern[]
+// 'insights'       → Insight[]
+// 'score'          → ScoreState
+
+interface UserMeta {
+  userId: string;
   email: string;
-  language: 'en' | 'es';      // User's chosen language
+  name: string;
+  language: 'en' | 'es';
   createdAt: string;
+  onboarding: { completed: boolean; currentStep: number };
 
-  parts: Part[];
-  sessions: Session[];
-  insights: Insight[];
-  selfLeadershipScore: number; // 0-100, computed metric
+  // MI progression
+  stage: 'engage' | 'focus' | 'evoke' | 'integrate';
+  sessionCount: number;
+  lastSessionDate: string;
+  streak: number;
 
-  onboarding: {
-    completed: boolean;
-    currentStep: number;
-  };
+  // Pre-generated question for next session (generated post-session, ready to go)
+  pendingQuestion: {
+    text: string;
+    targetDimension: ACTDimension;
+    questionType: string;
+    generatedAt: string;
+  } | null;
 }
 
-// DO Storage Strategy: split into separate keys to avoid 128KB limit
-// 'meta'           → { userId, email, language, onboarding, createdAt }
-// 'parts'          → Part[]
-// 'session:{id}'   → Session (one key per session)
-// 'session_index'  → { id, startedAt, primaryPartId, duration }[]
-// 'insights'       → Insight[]
-// 'score'          → { current: number, history: { date, score }[] }
+type ACTDimension =
+  | 'present_moment'
+  | 'acceptance'
+  | 'defusion'
+  | 'self_as_context'
+  | 'values_clarity'
+  | 'committed_action';
 
-interface Part {
-  id: string;
-  name: string;               // User-given: "The Critic", "Little Me", etc.
-  archetype: string;           // System-detected: critic, protector, exile, etc.
-  voiceId: string;             // ElevenLabs voice ID
-
-  role: string;                // What this part does: "Keeps me from failing"
-  fear: string;                // What it's afraid of: "Being exposed as fraud"
-  protects: string[];          // IDs of parts it protects (protector → exile)
-
-  dialogueHistory: DialogueTurn[];
-  discoveredAt: string;
-  lastSpokenTo: string;
-  sessionCount: number;
-
-  unburdened: boolean;         // IFS: has this part released its burden?
+interface ScoreState {
+  dimensions: Record<ACTDimension, number>; // 0–100 each
+  overall: number;
+  history: { date: string; overall: number; dimensions: Record<ACTDimension, number> }[];
 }
 
 interface Session {
   id: string;
   startedAt: string;
-  endedAt: string;
-  primaryPartId: string;       // The part this session focused on
+  endedAt?: string;
+  duration?: number;
+
+  question: string;                    // The question that was asked
+  targetDimension: ACTDimension;
+  questionType: string;
+  stage: string;                       // MI stage at time of session
 
   transcript: TranscriptEntry[];
-  insights: string[];          // AI-generated insights from this session
-  selfLeadershipBefore: number;
-  selfLeadershipAfter: number;
+  summary: string;                     // AI-generated, 2–3 sentences
+  dimensionScores: Record<ACTDimension, number>; // scored post-session
+  changeTalkDetected: boolean;         // MI: did user express change talk?
+  newPatternsFound: string[];          // pattern IDs extracted this session
+}
 
-  summary: string;             // AI-generated session summary
+interface TranscriptEntry {
+  speaker: 'user' | 'ai';
+  text: string;
+  timestamp: string;
+}
+
+interface SessionIndexEntry {
+  id: string;
+  startedAt: string;
+  duration?: number;
+  summary?: string;
+  question: string;
+}
+
+interface ExtractedPattern {
+  id: string;
+  text: string;                        // e.g. "returns to theme of inadequacy"
+  phrase?: string;                     // exact phrase: "not enough"
+  occurrences: number;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  sessionIds: string[];
+  dimension: ACTDimension;
 }
 
 interface Insight {
   id: string;
-  text: string;                // "You've mentioned your father 9 times across 3 parts"
-  relatedPartIds: string[];
+  text: string;                        // "You've used the word 'stuck' 11 times across 4 sessions."
   surfacedAt: string;
-  sessionId: string;
   acknowledged: boolean;
-}
-
-interface DialogueTurn {
-  speaker: 'user' | 'part' | 'facilitator';
-  text: string;
-  timestamp: string;
-  emotion?: string;            // AI-detected emotion
-}
-
-interface TranscriptEntry {
-  speaker: 'user' | 'facilitator' | string; // string = part name
-  text: string;
-  timestamp: string;
+  patternIds: string[];
 }
 ```
 
 ---
 
-## Parts Map UI (The Viral Visual)
+## Session Flow (Detailed)
 
-### Core: react-three-fiber 3D Visualization
+### Before Session (on dashboard load)
+1. Fetch `meta` from DO → check if `pendingQuestion` exists
+2. If yes: use it. If no: call `/generate-question` via Workers AI (blocking, shown as loading)
+3. Display question text on dashboard so user can see what's coming (optional — could hide for surprise)
 
-- Parts rendered as **softly glowing 3D spheres** floating in space around a central **Self** node
-- **Bloom post-processing** for the glow effect (via @react-three/postprocessing EffectComposer)
-- **OrbitControls** for user rotation/zoom (drei)
-- **MeshDistortMaterial** on Self node for organic, living appearance
-- Each part-orb colored by archetype: warm oranges/reds = protectors, cool blues = exiles, neutral = managers
-- **Luminous threads** (animated line geometry) connecting related parts (protector → exile)
-- **Particle field** background for depth and atmosphere
-- **Self node grows** as selfLeadershipScore increases
-- Hover: orb scales up, name label appears (drei Html/Text)
-- Click: opens part detail panel, can start session
-- **Golden-angle spiral** positioning for aesthetic orbital layout
-- New parts animate in with spring-like interpolation via useFrame
+### Session Start
+1. POST `/api/session/start` → DO creates session record, returns `sessionId`
+2. Call `/api/session/signed-url` → Worker calls ElevenLabs API to get signed URL
+3. Signed URL request body includes system prompt with:
+   - Today's question (verbatim — agent opens with this)
+   - Last 3 session summaries
+   - Top 3 emotional patterns
+   - User's name
+   - Stage-specific behavioral instructions
+   - Hard constraints: reflect ≤15 words, one follow-up max, close with "Let that sit"
+4. `useConversation({ signedUrl })` starts the ElevenLabs session
 
-### Animation Libraries
+### During Session
+- ElevenLabs agent asks the question, listens, reflects, optionally follows up, closes
+- `onMessage` callback captures transcript entries → stored in local state
+- `isSpeaking` drives the Framer Motion orb animation
 
-```
-react-three-fiber for:
-  - 3D scene rendering (Canvas, useFrame, useThree)
-  - Orbital sphere layout with smooth floating animation
-  - Bloom glow post-processing
-  - Interactive 3D controls (OrbitControls)
-  - Hover/click interactions on 3D objects
-
-framer-motion for (UI only, NOT the 3D map):
-  - Page transitions and route animations
-  - Panel slide-ins (part detail, session view)
-  - Onboarding flow step transitions
-  - Button hover/tap animations
-  - AnimatePresence for modal/overlay entrances
-```
-
-### Visual Targets for Video
-
-The parts map is what people screenshot and share. It must look stunning in 3D:
-- Dark background, glowing spheres with bloom post-processing
-- Slow orbital floating motion (sine wave via useFrame)
-- Luminous threads that animate between connected parts
-- Particle field giving depth and a "floating in your psyche" feeling
-- Self node at center with distinct radiance (MeshDistortMaterial + emissive)
-- Smooth camera orbit on idle for cinematic video footage
+### Session End
+1. User taps "End" or agent closes naturally
+2. `conversation.endSession()`
+3. POST `/api/session/end` with transcript
+4. Worker calls Workers AI: score transcript across 6 dimensions
+5. Worker calls Workers AI: extract new patterns from this session
+6. Worker calls Workers AI: generate 2–3 sentence summary
+7. Worker updates DO: session complete, patterns merged, scores updated
+8. Worker calls Workers AI: generate next session's question (stored as `pendingQuestion`)
+9. Worker checks: any new insight threshold crossed? If yes, generate and store insight.
+10. Client receives: `{ summary, dimensionDelta, newInsight? }`
 
 ---
 
-## API Routes (Next.js)
+## Workers AI Prompts
+
+### /generate-question
 
 ```
-/api/auth/[...nextauth]    Auth.js Google OAuth handlers
-/api/session/start         Start new session (connects to DO, gets facilitator ready)
-/api/session/end           End session (triggers summary, insight generation)
-/api/parts                 GET: list user's parts. POST: create new part
-/api/parts/[id]            GET: part detail. PATCH: update part
-/api/insights              GET: user's insights
-/api/ws                    WebSocket upgrade → CF Worker → Durable Object
+You are generating ONE question for a voice-based self-knowledge session.
+
+User context:
+- Name: {name}
+- Sessions completed: {sessionCount}
+- Current MI stage: {stage} ({stageDescription})
+- Target ACT dimension: {dimension} ({dimensionDescription})
+- Question type: {questionType}
+- Emotional patterns detected: {patterns}
+- Last session summary: {lastSummary}
+- Specific phrases to reference (if relevant): {anchorPhrases}
+
+Generate ONE question that:
+1. Targets the ACT dimension: {dimension}
+2. Uses the question type: {questionType} (appropriate for {stage} stage)
+3. References a specific thing they said only if it creates a precise, meaningful connection
+4. Is under 25 words
+5. Contains no advice, no interpretation, no judgment
+6. Is specific enough to feel slightly uncomfortable — not a generic journaling prompt
+7. A person should feel: "how did it know to ask that?"
+
+Return ONLY the question. No preamble, no explanation.
+```
+
+### /score-session
+
+```
+Score this voice session transcript across 6 ACT dimensions.
+Each score: 0 = not addressed, 1–3 = surface mention, 4–7 = genuine engagement, 8–10 = breakthrough moment.
+
+Transcript:
+{transcript}
+
+Return JSON:
+{
+  "present_moment": number,
+  "acceptance": number,
+  "defusion": number,
+  "self_as_context": number,
+  "values_clarity": number,
+  "committed_action": number,
+  "change_talk_detected": boolean,
+  "change_talk_phrases": string[]
+}
+```
+
+### /extract-patterns
+
+```
+Analyze this transcript and the user's existing patterns. Extract any new recurring themes.
+
+Existing patterns: {existingPatterns}
+New transcript: {transcript}
+Previous transcripts (last 5 summaries): {summaries}
+
+Return JSON array of new patterns only (not existing ones):
+[{
+  "text": "short description of pattern",
+  "phrase": "exact phrase if applicable",
+  "dimension": "act_dimension"
+}]
+
+Return empty array if no new patterns. Max 2 new patterns per session.
+```
+
+### /generate-insight
+
+```
+Generate ONE insight observation for this user based on their detected patterns.
+This will be shown to the user as a notable observation.
+
+Patterns: {patterns}
+Session count: {sessionCount}
+
+Rules:
+- Factual and specific, not interpretive ("You've used the word X 11 times" not "You seem to struggle with X")
+- Under 30 words
+- Should feel like something only someone who had listened carefully for weeks would notice
+- Never diagnostic, never prescriptive
+
+Return ONLY the insight text.
 ```
 
 ---
 
-## Cloudflare Worker Routes
+## UI — Session View
+
+The session screen is one thing: a breathing orb in the center of a dark screen.
 
 ```
-/ws                        WebSocket upgrade, JWT validation, route to DO
-/api/do/*                  Proxy to Durable Object methods
+State: idle
+- Orb: slow pulse, small, dark emerald
+- Text: the question (centered, small, white/30)
+- Button: "Begin" (bottom center)
+
+State: connecting
+- Orb: accelerating pulse
+- Text: "..."
+
+State: AI speaking
+- Orb: large, bright, animated (Framer Motion spring scale + opacity)
+- Text: last AI sentence as subtitle (white/25, italic)
+
+State: user speaking (isSpeaking = false but connected)
+- Orb: small, listening pulse
+- Text: "listening" (barely visible)
+
+State: session ended
+- Orb: fades
+- Session summary appears (slide up from bottom)
+- If new insight: insight card appears above summary
+```
+
+All animations: **Framer Motion only**. No Three.js, no canvas.
+
+The orb is a `div` with `border-radius: 50%` and a radial background. Animated with `motion.div` spring physics on scale and opacity. Simple, fast to build, looks great.
+
+---
+
+## Dashboard
+
+```
+Header: "Good morning, {name}" + streak + sign out
+Today's question: shown upfront (glass card, large, readable)
+  → "Begin" button
+  → If already done today: "Come back tomorrow"
+
+Progress (below the fold):
+  - 6 dimension bars (ACT) — how each has evolved over time
+  - Session history (last 10, each with date + one-line summary)
+  - Insights (if any new: highlighted at top)
+
+Stage indicator: "Engage · 4 sessions" → "Focus · 12 sessions" (subtle, bottom)
+```
+
+---
+
+## API Routes
+
+```
+POST /api/session/start         Create session in DO, return sessionId
+POST /api/session/end           Save transcript, trigger Workers AI pipeline
+GET  /api/session/signed-url    Get ElevenLabs signed URL with injected context
+GET  /api/meta                  User meta + pending question + scores
+GET  /api/insights              User insights (unacknowledged first)
+POST /api/insights/:id/ack      Acknowledge insight
+GET  /api/history               Session index (for dashboard list)
 ```
 
 ---
@@ -346,220 +501,115 @@ The parts map is what people screenshot and share. It must look stunning in 3D:
 ## Environment Variables
 
 ```bash
-# ── Auth ──────────────────────────────────────────────────
-GOOGLE_CLIENT_ID=...
-GOOGLE_CLIENT_SECRET=...
-NEXTAUTH_SECRET=...
+# Auth
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+NEXTAUTH_SECRET=
 NEXTAUTH_URL=https://parts.app
 
-# ── ElevenLabs ────────────────────────────────────────────
-ELEVENLABS_API_KEY=xi-...
-NEXT_PUBLIC_ELEVENLABS_FACILITATOR_AGENT_ID=...
+# ElevenLabs
+ELEVENLABS_API_KEY=
+NEXT_PUBLIC_ELEVENLABS_AGENT_ID=   # ONE agent, one voice
 
-# ── Cloudflare ────────────────────────────────────────────
-CLOUDFLARE_ACCOUNT_ID=...
-CLOUDFLARE_API_TOKEN=...
+# Cloudflare
+CLOUDFLARE_ACCOUNT_ID=
+CLOUDFLARE_API_TOKEN=
 
-# ── App ───────────────────────────────────────────────────
+# App
 NEXT_PUBLIC_APP_URL=https://parts.app
 ```
 
 ---
 
-## Build Order — What to Ship First
+## Build Order
 
-### Phase 1: Auth + Storage Foundation (45 min)
-Auth.js Google OAuth, JWT strategy, DO split-key storage restructure, worker JWT validation, client helpers.
+### 1. DO data model + API (45 min)
+Update DO to new schema. Wire `meta`, `session`, `patterns`, `insights`, `score` keys.
+All API routes stub out correctly. Progress lives in DO, not localStorage.
 
-### Phase 2: Language Selection + Onboarding (30 min)
-EN/ES picker, i18n dictionary, onboarding flow (language → IFS intro → name first part → map), dashboard page with auth guard.
+### 2. Workers AI question generation (30 min)
+`/generate-question` endpoint. Takes DO state, returns question. Store as `pendingQuestion` in meta.
+Test with hardcoded user state first.
 
-### Phase 3: ElevenLabs Multi-Voice Agent (60 min) — **← CORE WOW**
-Replace placeholder voice IDs, build agent config with IFS system prompt + XML voice tags, SessionView with `@11labs/react` useConversation hook, VoiceOrb audio-reactive animation, live transcript, Zustand state management.
+### 3. ElevenLabs session with injected context (60 min) ← CORE
+`/api/session/signed-url`: build system prompt dynamically from DO state.
+Agent opens with the pre-generated question verbatim.
+Session feels personal because it IS — it has your history in the prompt.
 
-### Phase 4: 3D Parts Map (90 min) — **← WHAT GOES VIRAL**
-react-three-fiber Canvas with bloom post-processing, SelfNode with MeshDistortMaterial, PartOrb spheres with archetype colors, RelationshipThreads luminous lines, ParticleField background, golden-angle spiral layout, PartDetailPanel slide-in.
+### 4. Post-session Workers AI pipeline (45 min)
+Score → extract patterns → update scores → generate next question → check insight threshold.
+All async after session ends. Dashboard refreshes to show delta.
 
-### Phase 5: Integration + State Flow (45 min)
-Wire map → detail → session → map update flow, session persistence to DO, insight generation, self-leadership score computation and display.
+### 5. Session view UI — the orb (45 min)
+Framer Motion orb. One screen. Clean. Looks great in video.
 
-### Phase 6: Ethics + Polish + Deploy (30 min) — **← LIVE URL FOR JUDGES**
-Crisis detection (988 Lifeline modal), therapy disclaimer, deploy CF Pages + Workers.
+### 6. Dashboard + history (30 min)
+Today's question card. 6 dimension bars. Session history. Insight card.
 
----
+### 7. Onboarding (20 min)
+3 steps: name → language → first question preview. Then begin.
 
-## Time Allocation (6 days)
-
-```
-CLAUDE.md + plan        10%
-Core build              30%
-Map UI + polish         10%
-Video + editing         35%
-Social + submit         15%
-```
-
----
-
-## Demo Script (90 seconds)
-
-### HOOK — 0 to 8 seconds (MOST IMPORTANT)
-**ON CAMERA — DIRECT ADDRESS**
-Sit in a quiet room. Look at camera. Say this in one breath:
-
-> *"There's a voice in your head that tells you you're not enough. This is what happens when you finally talk back to it."*
-
-**SCREEN RECORD — APP OPEN** (0:08)
-Show the Parts map — a clean orbital UI with 3-4 named parts as nodes. Inner Critic (red), Perfectionist (orange), Inner Child (soft blue). Tap Inner Critic.
-
-### THE WOW — 8 to 60 seconds (THIS IS THE PRODUCT)
-
-**VOICE — APP FACILITATOR** (warm, calm ElevenLabs voice) (0:10)
-> *"You're about to speak with your Inner Critic. Remember — you're not this part. You're the one talking to it. Whenever you're ready."*
-
-**YOU SPEAK** — natural, slightly nervous (0:18)
-> *"Hey. Why do you always tell me my work isn't good enough?"*
-
-**INNER CRITIC RESPONDS** — DIFFERENT VOICE (clipped, slightly cold) (0:22)
-The voice changes noticeably. Cooler, more precise. This is the part speaking.
-> *"Because if I don't, you get complacent. And then you fail. And then everyone sees it."*
-
-**YOU** — pause, then (0:30)
-> *"What are you actually afraid of?"*
-
-**INNER CRITIC** — slightly slower now (0:34)
-> *"...that you'll find out you're not as capable as people think. That it was all luck."*
-
-**FACILITATOR VOICE RETURNS** — gently (0:40)
-> *"That's impostor syndrome, and it's a protector part. It's been working hard for a long time. Ask it what it would need to finally rest."*
-
-**SCREEN — PARTS MAP UPDATES LIVE** (0:48)
-A dotted line draws itself between Inner Critic and a node labeled "Fear of exposure." New insight badge appears: "Protector role confirmed." The map is visibly growing.
-
-### THE NORTH STAR — 60 to 80 seconds (WHY IT MATTERS)
-
-**BACK ON CAMERA** (1:00)
-> *"That voice has been running my life for 20 years. I finally asked it what it was afraid of. It took 40 seconds."*
-
-**SCREEN — SHOW MAP AFTER 3 WEEKS** (1:08)
-Zoom out on a fuller map — 6 parts, relationship lines, Self node at center growing larger. Show the progress metric: "Self-leadership score: 7 sessions, 3 parts unburdened."
-
-### CLOSER — 80 to 90 seconds (CTA)
-
-**DIRECT TO CAMERA** (1:20)
-> *"Built with ElevenLabs voice AI and Cloudflare. Every session lives in your own persistent space at the edge. Your parts are waiting. parts.app"*
+### 8. Deploy + ethics (20 min)
+CF Pages + Workers. Crisis detection. Disclaimer. Live URL.
 
 ---
 
-## Pricing Model
+## The Video (90 seconds)
 
-- **Free** — 1 part, 3 sessions. Enough to have the first breakthrough.
-- **$19/mo** — unlimited parts, unlimited sessions, full insight engine, export.
-- **$49/mo** — therapist tier: share your parts map read-only with your human therapist.
+**Hook (0–6s): on camera**
+> *"Most AI asks you to ask it questions. This one only asks you questions. And it gets harder every time."*
 
-**Key retention mechanic:** your parts map is unique to you and grows richer over time. Leaving means losing it.
+**Show (6–60s): screen record**
+- Open app → today's question appears: *"You described your relationship with work last week but never said what you actually want from it. What do you want?"*
+- Tap Begin → orb pulses to life
+- User answers (genuine, slightly uncomfortable)
+- AI reflects: *"So the wanting feels dangerous."*
+- AI closes: *"Let that sit."*
+- Session summary slides up: 3 sentences, precise
+- Scroll to show: session 14 of 40. Dimension bars moving.
 
----
+**The pattern moment (60–75s)**
+Show insight surfacing:
+> *"You've used the word 'deserve' 9 times across 6 sessions. Always about other people. Never about yourself."*
 
-## Ethical Requirements
+Pause. Let that land.
 
-**MUST include before launch:**
-
-- Disclaimer: "Parts is not therapy and is not a replacement for professional mental health care."
-- Crisis detection: if user expresses suicidal ideation or severe distress, facilitator immediately provides crisis resources (988 Lifeline, Crisis Text Line) and gently suggests professional help.
-- Data privacy: all session data encrypted at rest in Durable Object. User can export or delete all data.
-- No diagnosis: the app never diagnoses conditions. It facilitates self-exploration.
-
-The IFS community will respect this. They're the launch audience.
-
----
-
-## Repository Structure
-
-```
-Parts/
-├── CLAUDE.md                          # This file — project source of truth
-├── README.md                          # Public-facing project description
-├── .env.example                       # Template for environment variables
-├── .gitignore
-│
-├── app/                               # Next.js 15 App Router
-│   ├── layout.tsx                     # Root layout + fonts + AuthProvider
-│   ├── page.tsx                       # Landing page / main app
-│   ├── globals.css                    # Tailwind + custom styles
-│   ├── auth/
-│   │   └── [...nextauth]/route.ts     # Auth.js Google OAuth
-│   └── api/
-│       ├── session/
-│       │   ├── start/route.ts         # Start IFS session
-│       │   └── end/route.ts           # End session, trigger summary
-│       ├── parts/
-│       │   ├── route.ts               # GET list, POST create
-│       │   └── [id]/
-│       │       ├── route.ts           # GET detail, PATCH update
-│       │       └── speak/route.ts     # POST: generate part TTS response
-│       └── insights/route.ts          # GET user insights
-│
-├── components/
-│   ├── three/                         # 3D visualization (react-three-fiber)
-│   │   ├── PartsMap3D.tsx             # Canvas + EffectComposer + Bloom + OrbitControls
-│   │   ├── SelfNode.tsx               # Central Self sphere (MeshDistortMaterial)
-│   │   ├── PartOrb.tsx                # Individual part sphere
-│   │   ├── RelationshipThreads.tsx    # Luminous animated connections
-│   │   └── ParticleField.tsx          # Background particles for depth
-│   ├── providers/
-│   │   └── AuthProvider.tsx           # Auth.js SessionProvider wrapper
-│   ├── SessionView.tsx               # Active voice session UI
-│   ├── VoiceOrb.tsx                  # Audio-reactive pulse animation
-│   ├── TranscriptView.tsx            # Live session transcript
-│   ├── PartDetailPanel.tsx           # Part info slide-in panel
-│   ├── LanguageSelector.tsx          # EN/ES language picker
-│   ├── OnboardingFlow.tsx            # Guided first session
-│   ├── CrisisDetection.tsx           # Crisis keyword detection + resources
-│   ├── Disclaimer.tsx                # Therapy disclaimer
-│   └── SelfLeadershipScore.tsx       # Progress metric display
-│
-├── lib/
-│   ├── types.ts                       # TypeScript interfaces (from data model above)
-│   ├── elevenlabs.ts                  # ElevenLabs multi-voice agent config builder
-│   ├── auth.ts                        # Auth.js configuration
-│   ├── cloudflare.ts                  # DO client helpers
-│   ├── voices.ts                      # Voice ID mappings for archetypes (multilingual)
-│   ├── i18n.ts                        # EN/ES string dictionary
-│   ├── orbital.ts                     # Golden-angle spiral 3D positioning math
-│   └── store.ts                       # Zustand state stores
-│
-├── worker/                            # Cloudflare Worker
-│   ├── index.ts                       # Main worker: auth, routing, WebSocket
-│   ├── durable-object.ts             # UserPsyche Durable Object class
-│   └── wrangler.toml                  # Cloudflare deployment config
-│
-├── package.json
-├── tsconfig.json
-├── next.config.ts
-├── postcss.config.mjs
-└── tailwind.config.ts
-```
+**Closer (75–90s): on camera**
+> *"It knows what to ask because it remembers everything. Built on Cloudflare and ElevenLabs. The more you use it, the harder it gets. That's how it works."*
 
 ---
 
-## The One Thing That Must Work Perfectly on Video
+## Pricing
 
-The voice switch. When you're talking to the facilitator and then ask to speak with a part — the voice must change noticeably and immediately. That moment of hearing a different voice speak as your inner critic is the entire product in 2 seconds. If this is laggy or unclear, the video doesn't land. Everything else can be rough.
+- **Free**: 7 sessions. Enough to reach Stage 2 and feel the shift.
+- **$12/mo**: unlimited sessions, full pattern engine, insight history.
+- **$29/mo**: export your full history + summaries as a readable document. Share with your therapist.
+
+**Retention mechanic**: your pattern history and dimension trajectory are irreplaceable. You cannot recreate 40 sessions of context. Nobody cancels.
+
+---
+
+## Ethics
+
+- Not therapy. Not a replacement for professional mental health care. Stated clearly.
+- Crisis detection: if user expresses suicidal ideation → agent immediately provides 988 Lifeline, closes session, suggests professional help.
+- No diagnosis. Ever. The AI observes patterns; it never labels the person.
+- Data: all stored encrypted in Durable Object. User can delete everything.
+- The questions are hard on purpose. That's the point. But the voice is never harsh.
 
 ---
 
 ## Critical Invariants
 
-- **Never expose API keys client-side** — all ElevenLabs and Cloudflare calls go through API routes or Workers
-- **One Durable Object per user** — derived from Google OAuth ID, deterministic
-- **Parts persist forever** — a part is never deleted, only archived
-- **Session transcripts are immutable** — once a session ends, its transcript never changes
-- **Voice consistency** — a part's voice ID never changes once assigned
-- **Ethical guardrails always on** — crisis detection, disclaimers, no diagnosis
-- **Self-leadership score is transparent** — users can see how it's calculated
+- **Progress lives in the Durable Object.** Never localStorage for anything important.
+- **One voice.** Consistency across all sessions builds the relationship. Never change the voice mid-product.
+- **The question is generated from the user's actual history.** Never a generic prompt bank.
+- **Reflect, don't advise.** The AI says back what it heard. It never tells you what to do.
+- **Sessions are immutable once ended.** Transcripts never change.
+- **The question generation runs post-session** so it's ready before the next one. Never blocking the session start.
 
 ---
 
 **Last Updated:** March 27, 2026
-**Status:** Architecture updated — r3f 3D map, multi-voice ElevenLabs, EN/ES, split-key DO storage. Ready to build.
-**Deadline:** ~6 days (ElevenHacks #2 submission)
+**Status:** New direction — one voice, MI+ACT methodology, DO as truth store, Framer Motion only.
+**Deadline:** ~5 days (ElevenHacks #2)

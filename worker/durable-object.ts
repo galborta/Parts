@@ -89,6 +89,7 @@ export class UserPsyche extends DurableObject<Env> {
     if (pathname === '/api/sessions'         && request.method === 'GET')   return this.handleGetSessions();
     if (pathname === '/api/insights'         && request.method === 'GET')   return this.handleGetInsights();
     if (pathname === '/api/progress'         && request.method === 'GET')   return this.handleGetProgress();
+    if (pathname === '/api/reset'              && request.method === 'POST')  return this.handleReset();
     if (pathname === '/api/onboarding/complete' && request.method === 'POST') return this.handleCompleteOnboarding();
 
     return Response.json({ error: 'Not found' }, { status: 404 });
@@ -315,6 +316,12 @@ export class UserPsyche extends DurableObject<Env> {
         .filter((s): s is string => Boolean(s)),
       recentHistory: recentSessions,
     });
+  }
+
+  // ── Reset ─────────────────────────────────────────────────
+  private async handleReset(): Promise<Response> {
+    await this.ctx.storage.deleteAll();
+    return Response.json({ status: 'reset', message: 'All user data deleted' });
   }
 
   // ── Onboarding ────────────────────────────────────────────

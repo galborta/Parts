@@ -20,13 +20,12 @@ interface SessionViewProps {
 
 function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: SessionViewProps) {
   const [sessionReady, setSessionReady] = useState(false);
+  const [sessionEnded, setSessionEnded] = useState(false);
   const [lastUserMessage, setLastUserMessage]   = useState('');
   const [lastAiMessage, setLastAiMessage]       = useState('');
   const [doSessionId, setDoSessionId]           = useState<string | null>(null);
   const transcriptRef = useRef<Array<{ speaker: 'user' | 'ai'; text: string; timestamp: string }>>([]);
   const startTimeRef  = useRef(Date.now());
-  const shouldEndRef = useRef(false);
-  const endingRef    = useRef(false); // prevent double-end
   const voice = VOICES[voiceIndex] || VOICES[0];
 
   const conversation = useConversation({
@@ -34,12 +33,9 @@ function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: Sessio
       setSessionReady(true);
       startTimeRef.current = Date.now();
     },
-    onDisconnect: (details: any) => {
+    onDisconnect: () => {
       setSessionReady(false);
-      // Agent-initiated disconnect — end the session
-      if (details?.reason === 'agent') {
-        handleEndSessionRef.current?.();
-      }
+      setSessionEnded(true);
     },
     onMessage: (message: any) => {
       const text = typeof message.message === 'string' ? message.message : '';
@@ -52,11 +48,11 @@ function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: Sessio
         transcriptRef.current.push({ speaker: 'user', text: text.trim(), timestamp: new Date().toISOString() });
       }
     },
+    onUnhandledClientToolCall: (params: any) => {
+      console.warn('[Parts] Unhandled client tool call:', params);
+    },
     onError: (error: any) => console.error('[Parts] ElevenLabs error:', error),
   });
-
-  // Ref to handleEndSession so the client tool can call it without stale closures
-  const handleEndSessionRef = useRef<(() => void) | null>(null);
 
   const { status, isSpeaking } = conversation;
 
@@ -64,7 +60,6 @@ function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: Sessio
   useEffect(() => {
     const start = async () => {
       try {
-        // 1. Get signed URL + dynamic system prompt from our route
         const res = await fetch('/api/session/start', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -72,7 +67,7 @@ function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: Sessio
         });
         const data = await res.json();
 
-        // 2. Create a DO session record (for history tracking) via Next.js API
+        // Create DO session record
         try {
           const doRes = await fetch('/api/session/do-start', { method: 'POST' });
           if (doRes.ok) {
@@ -81,12 +76,11 @@ function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: Sessio
           }
         } catch { /* non-critical */ }
 
-        // 3. Start ElevenLabs with the dynamic system prompt + end_session tool
+        // Register end_session as a client tool — just flips the flag
         const clientTools = {
-          end_session: async () => {
-            // AI calls this when it decides the session is over
-            handleEndSessionRef.current?.();
-            return 'Session ended';
+          end_session: () => {
+            setSessionEnded(true);
+            return 'ok';
           },
         };
 
@@ -109,24 +103,22 @@ function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: Sessio
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-end: at 90s set flag to end after AI finishes speaking, hard cap at 120s
+  // Safety: hard cap at 120s
   useEffect(() => {
-    const softTimer = setTimeout(() => { shouldEndRef.current = true; }, 90_000);
-    const hardTimer = setTimeout(() => handleEndSession(), 120_000);
-    return () => { clearTimeout(softTimer); clearTimeout(hardTimer); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const timer = setTimeout(() => setSessionEnded(true), 120_000);
+    return () => clearTimeout(timer);
   }, []);
 
-  // ── End session ──────────────────────────────────────────
-  const handleEndSession = useCallback(async () => {
-    if (endingRef.current) return; // prevent double-end
-    endingRef.current = true;
+  // ── Session ended — cleanup & notify parent ──────────────
+  useEffect(() => {
+    if (!sessionEnded) return;
 
+    // Disconnect ElevenLabs if still connected
     if (sessionReady) {
       try { conversation.endSession(); } catch {}
     }
 
-    // Build a one-line summary from the first user answer
+    // Build summary from first user answer
     const firstUserTurn = transcriptRef.current.find((t) => t.speaker === 'user');
     const summary = firstUserTurn
       ? firstUserTurn.text.slice(0, 120) + (firstUserTurn.text.length > 120 ? '...' : '')
@@ -142,21 +134,17 @@ function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: Sessio
           transcript: transcriptRef.current,
           summary,
         }),
-      }).catch(() => {/* non-critical */});
+      }).catch(() => {});
     }
 
     onEnd(lastUserMessage || summary || 'Session completed');
-  }, [conversation, sessionReady, onEnd, lastUserMessage, doSessionId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionEnded]);
 
-  // Keep ref in sync so onDisconnect and client tool can access latest
-  handleEndSessionRef.current = handleEndSession;
-
-  // End session once AI stops speaking (if soft timer has fired)
-  useEffect(() => {
-    if (!isSpeaking && shouldEndRef.current) {
-      handleEndSession();
-    }
-  }, [isSpeaking, handleEndSession]);
+  // ── Manual end (button) ──────────────────────────────────
+  const handleManualEnd = useCallback(() => {
+    setSessionEnded(true);
+  }, []);
 
   const speakerName = isSpeaking ? voice.name : 'Listening...';
 
@@ -220,7 +208,7 @@ function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: Sessio
         transition={{ delay: 0.4 }}
       >
         <button
-          onClick={handleEndSession}
+          onClick={handleManualEnd}
           className="px-6 py-3 rounded-full bg-white/[0.06] text-white/40
             hover:bg-white/[0.1] hover:text-white/60 transition-colors text-sm"
         >

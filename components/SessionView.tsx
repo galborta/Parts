@@ -25,7 +25,8 @@ function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: Sessio
   const [doSessionId, setDoSessionId]           = useState<string | null>(null);
   const transcriptRef = useRef<Array<{ speaker: 'user' | 'ai'; text: string; timestamp: string }>>([]);
   const startTimeRef  = useRef(Date.now());
-  const shouldEndRef  = useRef(false);
+  const shouldEndRef = useRef(false);
+  const endingRef    = useRef(false); // prevent double-end
   const voice = VOICES[voiceIndex] || VOICES[0];
 
   const conversation = useConversation({
@@ -33,7 +34,13 @@ function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: Sessio
       setSessionReady(true);
       startTimeRef.current = Date.now();
     },
-    onDisconnect: () => setSessionReady(false),
+    onDisconnect: (details: any) => {
+      setSessionReady(false);
+      // Agent-initiated disconnect — end the session
+      if (details?.reason === 'agent') {
+        handleEndSessionRef.current?.();
+      }
+    },
     onMessage: (message: any) => {
       const text = typeof message.message === 'string' ? message.message : '';
       if (!text.trim()) return;
@@ -47,6 +54,9 @@ function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: Sessio
     },
     onError: (error: any) => console.error('[Parts] ElevenLabs error:', error),
   });
+
+  // Ref to handleEndSession so the client tool can call it without stale closures
+  const handleEndSessionRef = useRef<(() => void) | null>(null);
 
   const { status, isSpeaking } = conversation;
 
@@ -71,9 +81,17 @@ function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: Sessio
           }
         } catch { /* non-critical */ }
 
-        // 3. Start ElevenLabs with the dynamic system prompt injected as an override
+        // 3. Start ElevenLabs with the dynamic system prompt + end_session tool
+        const clientTools = {
+          end_session: async () => {
+            // AI calls this when it decides the session is over
+            handleEndSessionRef.current?.();
+            return 'Session ended';
+          },
+        };
+
         if (data.signedUrl) {
-          const startOpts: any = { signedUrl: data.signedUrl };
+          const startOpts: any = { signedUrl: data.signedUrl, clientTools };
           if (data.systemPrompt) {
             startOpts.overrides = {
               agent: { prompt: { prompt: data.systemPrompt } },
@@ -81,7 +99,7 @@ function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: Sessio
           }
           await conversation.startSession(startOpts);
         } else if (data.agentId) {
-          await conversation.startSession({ agentId: data.agentId });
+          await conversation.startSession({ agentId: data.agentId, clientTools });
         }
       } catch (err) {
         console.error('[Parts] Failed to start session:', err);
@@ -101,6 +119,9 @@ function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: Sessio
 
   // ── End session ──────────────────────────────────────────
   const handleEndSession = useCallback(async () => {
+    if (endingRef.current) return; // prevent double-end
+    endingRef.current = true;
+
     if (sessionReady) {
       try { conversation.endSession(); } catch {}
     }
@@ -126,6 +147,9 @@ function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: Sessio
 
     onEnd(lastUserMessage || summary || 'Session completed');
   }, [conversation, sessionReady, onEnd, lastUserMessage, doSessionId]);
+
+  // Keep ref in sync so onDisconnect and client tool can access latest
+  handleEndSessionRef.current = handleEndSession;
 
   // End session once AI stops speaking (if soft timer has fired)
   useEffect(() => {

@@ -124,6 +124,16 @@ export class UserPsyche extends DurableObject<Env> {
     const { userId, email } = await request.json() as any;
     const existing = await this.ctx.storage.get('meta') as UserMeta | undefined;
     if (existing) {
+      // Backfill fields added after initial creation
+      let needsSave = false;
+      if (existing.sessionCount === undefined) {
+        const index = await this.ctx.storage.get('session_index') as SessionIndexEntry[] || [];
+        existing.sessionCount = index.length;
+        existing.streak = existing.streak || 0;
+        existing.lastSessionDate = existing.lastSessionDate || '';
+        needsSave = true;
+      }
+      if (needsSave) await this.ctx.storage.put('meta', existing);
       const parts = await this.ctx.storage.get('parts') as Part[] || [];
       return Response.json({ status: 'already_initialized', meta: existing, parts });
     }
@@ -296,9 +306,12 @@ export class UserPsyche extends DurableObject<Env> {
     const meta = await this.ctx.storage.get('meta') as UserMeta | undefined;
     if (!meta) return Response.json({ error: 'User not initialized' }, { status: 404 });
 
+    // session_index is the source of truth for session count
+    const index = await this.ctx.storage.get('session_index') as SessionIndexEntry[] || [];
+    const totalSessions = index.length;
+
     // Get today's sessions from the index
     const todayStr = new Date().toISOString().slice(0, 10);
-    const index = await this.ctx.storage.get('session_index') as SessionIndexEntry[] || [];
     const todaySessions = index.filter((s) => s.startedAt.slice(0, 10) === todayStr);
 
     // Get recent history (last 30 days with sessions)
@@ -307,7 +320,7 @@ export class UserPsyche extends DurableObject<Env> {
       .slice(-30);
 
     return Response.json({
-      sessionCount: meta.sessionCount || 0,
+      sessionCount: totalSessions,
       streak: meta.streak || 0,
       lastSessionDate: meta.lastSessionDate || '',
       todaySessionCount: todaySessions.length,

@@ -11,6 +11,9 @@ const VOICES = [
   { id: 'compassionate',  name: 'Victoria', role: 'The Compassionate',color: '#34d399' },
 ];
 
+// Phrases that signal the AI is done — used as fallback if tool doesn't fire
+const CLOSING_PATTERNS = /let that sit|see you next time|until next time|take care|goodbye|good bye|nos vemos|cuídate|closing.*session|end.*session/i;
+
 interface SessionViewProps {
   partId: string;
   voiceIndex: number;
@@ -26,6 +29,7 @@ function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: Sessio
   const [doSessionId, setDoSessionId]           = useState<string | null>(null);
   const transcriptRef = useRef<Array<{ speaker: 'user' | 'ai'; text: string; timestamp: string }>>([]);
   const startTimeRef  = useRef(Date.now());
+  const closingDetectedRef = useRef(false);
   const voice = VOICES[voiceIndex] || VOICES[0];
 
   const conversation = useConversation({
@@ -43,13 +47,21 @@ function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: Sessio
       if (message.source === 'ai') {
         setLastAiMessage(text.trim());
         transcriptRef.current.push({ speaker: 'ai', text: text.trim(), timestamp: new Date().toISOString() });
+        // Fallback: detect closing phrases in case tool doesn't fire
+        if (CLOSING_PATTERNS.test(text)) {
+          closingDetectedRef.current = true;
+        }
       } else if (message.source === 'user') {
         setLastUserMessage(text.trim());
         transcriptRef.current.push({ speaker: 'user', text: text.trim(), timestamp: new Date().toISOString() });
       }
     },
     onUnhandledClientToolCall: (params: any) => {
+      // Tool was called but not matched — end anyway
       console.warn('[Parts] Unhandled client tool call:', params);
+      if (params?.tool_name === 'end_session' || params?.name === 'end_session') {
+        setSessionEnded(true);
+      }
     },
     onError: (error: any) => console.error('[Parts] ElevenLabs error:', error),
   });
@@ -76,7 +88,7 @@ function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: Sessio
           }
         } catch { /* non-critical */ }
 
-        // Register end_session as a client tool — just flips the flag
+        // Register end_session client tool
         const clientTools = {
           end_session: () => {
             setSessionEnded(true);
@@ -103,11 +115,25 @@ function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: Sessio
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Safety: hard cap at 120s
+  // Hard cap at 120s — absolute safety net
   useEffect(() => {
     const timer = setTimeout(() => setSessionEnded(true), 120_000);
     return () => clearTimeout(timer);
   }, []);
+
+  // Fallback: when AI stops speaking after saying goodbye, end the session
+  // This catches the case where the tool doesn't fire but the AI said its closing line
+  useEffect(() => {
+    if (!isSpeaking && closingDetectedRef.current && !sessionEnded) {
+      // Small delay to let the tool call arrive first (if it's coming)
+      const timer = setTimeout(() => {
+        if (closingDetectedRef.current) {
+          setSessionEnded(true);
+        }
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [isSpeaking, sessionEnded]);
 
   // ── Session ended — cleanup & notify parent ──────────────
   useEffect(() => {

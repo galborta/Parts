@@ -93,17 +93,24 @@ function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: Sessio
         },
       };
 
-      if (data.signedUrl) {
-        const startOpts: any = { signedUrl: data.signedUrl, clientTools };
-        if (data.systemPrompt) {
-          startOpts.overrides = {
-            agent: { prompt: { prompt: data.systemPrompt } },
-          };
-        }
-        await conversation.startSession(startOpts);
+      const startOpts: any = { clientTools, connectionType: 'webrtc' };
+
+      if (data.conversationToken) {
+        startOpts.conversationToken = data.conversationToken;
+      } else if (data.signedUrl) {
+        startOpts.signedUrl = data.signedUrl;
+        delete startOpts.connectionType; // signed URL uses websocket
       } else if (data.agentId) {
-        await conversation.startSession({ agentId: data.agentId, clientTools });
+        startOpts.agentId = data.agentId;
       }
+
+      if (data.systemPrompt) {
+        startOpts.overrides = {
+          agent: { prompt: { prompt: data.systemPrompt } },
+        };
+      }
+
+      await conversation.startSession(startOpts);
     } catch (err) {
       console.error('[Baseline] Failed to start session:', err);
     }

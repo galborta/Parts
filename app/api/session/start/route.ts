@@ -76,29 +76,29 @@ export async function POST(request: Request) {
     voiceIndex,
   });
 
-  // ── Get signed URL from ElevenLabs ───────────────────────
+  // ── Get conversation token from ElevenLabs (WebRTC) ──────
   try {
     const elRes = await fetch(
-      `https://api.elevenlabs.io/v1/convai/conversation/get_signed_url?agent_id=${agentId}`,
+      `https://api.elevenlabs.io/v1/convai/conversation/token?agent_id=${agentId}`,
       { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY! } }
     );
 
     if (!elRes.ok) {
-      console.error('[Parts] ElevenLabs signed URL error:', await elRes.text());
-      return NextResponse.json({ error: 'Failed to get signed URL' }, { status: 500 });
+      console.error('[Baseline] ElevenLabs token error:', await elRes.text());
+      return NextResponse.json({ error: 'Failed to get conversation token' }, { status: 500 });
     }
 
-    const { signed_url } = await elRes.json() as { signed_url: string };
+    const { token: conversationToken } = await elRes.json() as { token: string };
 
     return NextResponse.json({
-      signedUrl: signed_url,
+      conversationToken,
       agentId,
       language,
-      systemPrompt,   // client uses this as override
+      systemPrompt,
       sessionCount,
     });
   } catch (err) {
-    console.error('[Parts] Error getting signed URL:', err);
+    console.error('[Baseline] Error getting conversation token:', err);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }

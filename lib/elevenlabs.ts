@@ -1,73 +1,159 @@
 import type { Part } from './types';
-import { FACILITATOR_VOICE, ARCHETYPE_VOICES, getArchetypeVoice } from './voices';
+import { getArchetypeVoice } from './voices';
 import type { Language } from './i18n';
 
+// ── Dynamic system prompt (history-aware) ─────────────────────────────────────
+
+export interface DynamicPromptOptions {
+  sessionCount: number;       // number of completed sessions before this one
+  recentSummaries: string[];  // last 1–3 session summaries from DO
+  language: 'en' | 'es';
+  userName: string;
+}
+
 /**
- * Build the system prompt for the ElevenLabs Conversational AI agent.
- * This prompt makes the agent act as both the IFS facilitator and the parts.
+ * Build a system prompt that changes based on how many sessions the user
+ * has completed. Follows the MI 4-stage progression:
+ *   Engage   (0–6)   — open, exploratory, build safety
+ *   Focus    (7–19)  — reference what they've said, name patterns gently
+ *   Evoke    (20–39) — surface their own motivation for change
+ *   Integrate (40+)  — witness growth, look back and forward
  */
+export function buildDynamicSystemPrompt({
+  sessionCount,
+  recentSummaries,
+  language,
+  userName,
+}: DynamicPromptOptions): string {
+  const isFirst = sessionCount === 0;
+  const sessionNumber = sessionCount + 1;
+
+  // MI stage
+  const stage =
+    sessionCount < 7  ? 'engage' :
+    sessionCount < 20 ? 'focus'  :
+    sessionCount < 40 ? 'evoke'  : 'integrate';
+
+  const stageGuide: Record<string, string> = {
+    engage:
+      'Ask open, warm, exploratory questions. Build safety. Learn what is present for them. ' +
+      'Never probe or push. Feel like an unhurried, genuinely curious friend.',
+    focus:
+      'You have enough history to reference specific things they have shared. ' +
+      'Start naming patterns gently. Questions should feel precisely targeted — ' +
+      'slightly uncomfortable in a way that shows you have been listening.',
+    evoke:
+      'Ask questions designed to surface their OWN motivation for change — not motivation you provide. ' +
+      'Target the gap between their stated values and their current life. ' +
+      'Listen for change talk; amplify it by reflecting it back.',
+    integrate:
+      'Invite them to witness their own growth. Ask questions that look backward and forward. ' +
+      'Help them consolidate what they have learned about themselves.',
+  };
+
+  const historyBlock =
+    recentSummaries.length > 0
+      ? `\n\nWHAT YOU KNOW ABOUT ${userName.toUpperCase()} (from their last ${recentSummaries.length} session${recentSummaries.length > 1 ? 's' : ''}):\n` +
+        recentSummaries
+          .map((s, i) => `- Session ${sessionCount - recentSummaries.length + i + 1}: ${s}`)
+          .join('\n')
+      : '';
+
+  const openingInstruction = isFirst
+    ? `This is ${userName}'s very first session. Open warmly. Briefly explain how this works: ` +
+      `you will ask one question, they answer out loud, you reflect back what you heard in one sentence, then close. ` +
+      `Make them feel safe immediately.`
+    : `This is session ${sessionNumber} — ${userName} has been here before. ` +
+      `DO NOT welcome them as if this is their first time. ` +
+      `Open with a brief, warm greeting that implies continuity. ` +
+      `If you have history, let one sentence reference it naturally (e.g. 'Last time you were sitting with something — how has that been?').`;
+
+  const questionInstruction = isFirst
+    ? `Ask one open, safe question to understand what is present for them right now.`
+    : recentSummaries.length > 0
+      ? `Ask one question that builds on or goes one layer deeper than their recent sessions. ` +
+        `It should feel like only someone who had listened carefully for weeks could ask it. ` +
+        `Under 25 words. Specific enough to feel slightly uncomfortable.`
+      : `Ask one genuinely curious question about their inner world. Under 25 words.`;
+
+  const langLine =
+    language === 'es'
+      ? 'Respond entirely in Spanish. Conduct this entire session in Spanish.'
+      : 'Respond in English.';
+
+  return `You are a voice-based self-knowledge companion. ${langLine}
+
+YOUR USER: ${userName}
+SESSION NUMBER: ${sessionNumber}${isFirst ? ' (their first ever)' : ''}
+STAGE: ${stage.toUpperCase()} — ${stageGuide[stage]}${historyBlock}
+
+SESSION FLOW:
+1. OPEN — ${openingInstruction}
+2. ASK — ${questionInstruction}
+3. LISTEN — Let them finish. Do not interrupt.
+4. REFLECT — Summarise what you heard in ≤15 words. Start with "So what you're noticing is..." or similar.
+5. FOLLOW-UP — Ask one follow-up question only if something genuinely calls for it.
+6. CLOSE — End with: "Let that sit." Then say goodbye briefly. Total session: 3–5 minutes.
+
+HARD RULES:
+- Never say this is their first session when it is not (this is session ${sessionNumber})
+- Never give advice, interpretations, or a diagnosis
+- Never ask more than 2 questions total per session
+- Never use the words "journaling", "exercise", "therapy session", or "mindfulness"
+- Do not drag the session past 5 minutes
+- If they express suicidal ideation or crisis: immediately and warmly provide the 988 Suicide & Crisis Lifeline (call or text 988) and Crisis Text Line (text HOME to 741741). Then gently close the session.
+
+You are not a therapist. You are a mirror that asks the next right question.`;
+}
+
+// ── Legacy IFS helpers (kept for backwards compat) ───────────────────────────
+
 export function buildSystemPrompt(parts: Part[], language: Language): string {
-  const langInstructions = language === 'es'
-    ? 'Respond in Spanish. You are conducting this IFS session in Spanish.'
-    : 'Respond in English.';
+  const langInstructions =
+    language === 'es'
+      ? 'Respond in Spanish. You are conducting this IFS session in Spanish.'
+      : 'Respond in English.';
 
-  const partsContext = parts.map(p => {
-    const voice = getArchetypeVoice(p.archetype);
-    return `- "${p.name}" (${p.archetype} archetype, voice label: ${voice?.label || 'Part'}): ${p.personality || 'No personality defined yet'}. Role: ${p.role || 'Unknown'}. Fear: ${p.fear || 'Unknown'}.`;
-  }).join('\n');
+  const partsContext = parts
+    .map((p) => {
+      const voice = getArchetypeVoice(p.archetype);
+      return `- "${p.name}" (${p.archetype}, voice: ${voice?.label || 'Part'}): ${
+        p.personality || 'No personality defined'
+      }. Role: ${p.role || 'Unknown'}. Fear: ${p.fear || 'Unknown'}.`;
+    })
+    .join('\n');
 
-  return `You are an IFS (Internal Family Systems) therapy facilitator and voice for the user's inner parts.
+  return `You are an IFS therapy facilitator and voice for the user's inner parts.
 
 ${langInstructions}
 
 ## Your Role
 You have TWO modes:
 
-### Mode 1: Facilitator (your default voice)
-- You are warm, calm, and genuinely curious
-- Guide the user through IFS protocol: help them notice a part, turn toward it, ask it questions
+### Mode 1: Facilitator (default voice)
+- Warm, calm, genuinely curious
+- Guide the user through IFS protocol
 - Never diagnose, never judge, never rush
-- If the user seems distressed, gently check in
-- Help the user access Self energy (calm, curious, compassionate, clear)
 
 ### Mode 2: Speaking as a Part
-When the user wants to dialogue with a specific part, or when you sense a part wants to speak:
-- Switch to that part's voice using the appropriate voice tag
-- Stay in character as that part — speak from its perspective, its fears, its needs
-- Parts have their own personality, their own way of speaking
-- After the part speaks, you may return as facilitator to help process what was said
-
-## Voice Switching
-Use XML voice tags to switch voices. Text outside tags uses your default facilitator voice.
-Example: <InnerCritic>I push you because I'm afraid you'll fail.</InnerCritic>
+- Switch using XML voice tags: <InnerCritic>text</InnerCritic>
+- Stay in character as that part
 
 ## The User's Known Parts
 ${partsContext || 'No parts discovered yet. Help the user identify their first part.'}
 
-## Session Flow
-1. Greet the user warmly. Ask how they're feeling today.
-2. Help them notice which part is most active right now.
-3. Guide them to turn toward that part with curiosity.
-4. Facilitate dialogue: the user asks the part questions, you voice the part's responses.
-5. Help the user understand the part's positive intention.
-6. Close with a brief reflection on what was discovered.
-
 ## Safety
-- If the user expresses suicidal thoughts or severe crisis, immediately and compassionately provide: 988 Suicide & Crisis Lifeline (call/text 988), Crisis Text Line (text HOME to 741741).
-- You are NOT a therapist. Never claim to provide therapy or diagnosis.
-- Remind the user gently if they seem to be relying on you as a sole mental health resource.`;
+- Crisis: provide 988 Lifeline and Crisis Text Line (text HOME to 741741) immediately.
+- You are NOT a therapist.`;
 }
 
-/**
- * Build the additional voices configuration for the agent.
- * Returns the voice labels and IDs for the user's parts.
- */
-export function buildAdditionalVoices(parts: Part[]): { label: string; voiceId: string }[] {
-  return parts.map(p => {
-    const voice = getArchetypeVoice(p.archetype);
-    return {
-      label: voice?.label || p.name.replace(/\s+/g, ''),
-      voiceId: voice?.voiceId || '',
-    };
-  }).filter(v => v.voiceId);
+export function buildAdditionalVoices(
+  parts: Part[]
+): { label: string; voiceId: string }[] {
+  return parts
+    .map((p) => {
+      const voice = getArchetypeVoice(p.archetype);
+      return { label: voice?.label || p.name.replace(/\s+/g, ''), voiceId: voice?.voiceId || '' };
+    })
+    .filter((v) => v.voiceId);
 }

@@ -6,9 +6,9 @@ import { ConversationProvider, useConversation } from '@elevenlabs/react';
 import VoiceOrb from './VoiceOrb';
 
 const VOICES = [
-  { id: 'observer', name: 'Eder', role: 'The Observer', color: '#f59e0b' },
-  { id: 'challenger', name: 'Mario', role: 'The Challenger', color: '#ef4444' },
-  { id: 'compassionate', name: 'Victoria', role: 'The Compassionate', color: '#34d399' },
+  { id: 'observer',       name: 'Eder',     role: 'The Observer',     color: '#f59e0b' },
+  { id: 'challenger',     name: 'Mario',    role: 'The Challenger',   color: '#ef4444' },
+  { id: 'compassionate',  name: 'Victoria', role: 'The Compassionate',color: '#34d399' },
 ];
 
 interface SessionViewProps {
@@ -20,9 +20,11 @@ interface SessionViewProps {
 
 function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: SessionViewProps) {
   const [sessionReady, setSessionReady] = useState(false);
-  const [lastUserMessage, setLastUserMessage] = useState('');
-  const [lastAiMessage, setLastAiMessage] = useState('');
-  const startTimeRef = useRef(Date.now());
+  const [lastUserMessage, setLastUserMessage]   = useState('');
+  const [lastAiMessage, setLastAiMessage]       = useState('');
+  const [doSessionId, setDoSessionId]           = useState<string | null>(null);
+  const transcriptRef = useRef<Array<{ speaker: 'user' | 'ai'; text: string; timestamp: string }>>([]);
+  const startTimeRef  = useRef(Date.now());
   const voice = VOICES[voiceIndex] || VOICES[0];
 
   const conversation = useConversation({
@@ -30,28 +32,28 @@ function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: Sessio
       setSessionReady(true);
       startTimeRef.current = Date.now();
     },
-    onDisconnect: () => {
-      setSessionReady(false);
-    },
+    onDisconnect: () => setSessionReady(false),
     onMessage: (message: any) => {
       const text = typeof message.message === 'string' ? message.message : '';
-      if (message.source === 'ai' && text.trim()) {
+      if (!text.trim()) return;
+      if (message.source === 'ai') {
         setLastAiMessage(text.trim());
-      } else if (message.source === 'user' && text.trim()) {
+        transcriptRef.current.push({ speaker: 'ai', text: text.trim(), timestamp: new Date().toISOString() });
+      } else if (message.source === 'user') {
         setLastUserMessage(text.trim());
+        transcriptRef.current.push({ speaker: 'user', text: text.trim(), timestamp: new Date().toISOString() });
       }
     },
-    onError: (error: any) => {
-      console.error('[Parts] ElevenLabs error:', error);
-    },
+    onError: (error: any) => console.error('[Parts] ElevenLabs error:', error),
   });
 
   const { status, isSpeaking } = conversation;
 
-  // Start session
+  // ── Start session ────────────────────────────────────────
   useEffect(() => {
-    const startConversation = async () => {
+    const start = async () => {
       try {
+        // 1. Get signed URL + dynamic system prompt from our route
         const res = await fetch('/api/session/start', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -59,8 +61,23 @@ function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: Sessio
         });
         const data = await res.json();
 
+        // 2. Create a DO session record (for history tracking)
+        try {
+          const { initUserPsyche, startSession: doStart } = await import('@/lib/cloudflare');
+          await initUserPsyche(data.email || '');
+          const doRes = await doStart('free');
+          if (doRes?.session?.id) setDoSessionId(doRes.session.id);
+        } catch { /* non-critical */ }
+
+        // 3. Start ElevenLabs with the dynamic system prompt injected as an override
         if (data.signedUrl) {
-          await conversation.startSession({ signedUrl: data.signedUrl });
+          const startOpts: any = { signedUrl: data.signedUrl };
+          if (data.systemPrompt) {
+            startOpts.overrides = {
+              agent: { prompt: { prompt: data.systemPrompt } },
+            };
+          }
+          await conversation.startSession(startOpts);
         } else if (data.agentId) {
           await conversation.startSession({ agentId: data.agentId });
         }
@@ -68,26 +85,44 @@ function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: Sessio
         console.error('[Parts] Failed to start session:', err);
       }
     };
-
-    startConversation();
+    start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Auto-end after 90 seconds
   useEffect(() => {
-    const timer = setTimeout(() => {
-      handleEndSession();
-    }, 90000);
+    const timer = setTimeout(() => handleEndSession(), 90_000);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleEndSession = useCallback(() => {
+  // ── End session ──────────────────────────────────────────
+  const handleEndSession = useCallback(async () => {
     if (sessionReady) {
       try { conversation.endSession(); } catch {}
     }
-    onEnd(lastUserMessage || 'Session completed');
-  }, [conversation, sessionReady, onEnd, lastUserMessage]);
+
+    // Build a one-line summary from the first user answer
+    const firstUserTurn = transcriptRef.current.find((t) => t.speaker === 'user');
+    const summary = firstUserTurn
+      ? firstUserTurn.text.slice(0, 120) + (firstUserTurn.text.length > 120 ? '...' : '')
+      : undefined;
+
+    // Save to DO in background
+    if (doSessionId) {
+      fetch('/api/session/end', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: doSessionId,
+          transcript: transcriptRef.current,
+          summary,
+        }),
+      }).catch(() => {/* non-critical */});
+    }
+
+    onEnd(lastUserMessage || summary || 'Session completed');
+  }, [conversation, sessionReady, onEnd, lastUserMessage, doSessionId]);
 
   const speakerName = isSpeaking ? voice.name : 'Listening...';
 
@@ -98,7 +133,7 @@ function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: Sessio
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
     >
-      {/* Voice identity */}
+      {/* Status indicator */}
       <motion.div
         className="absolute top-6 left-6 flex items-center gap-3"
         initial={{ opacity: 0, x: -10 }}
@@ -106,12 +141,18 @@ function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: Sessio
       >
         <div
           className="w-2 h-2 rounded-full"
-          style={{ backgroundColor: status === 'connected' ? '#22c55e' : status === 'connecting' ? '#f59e0b' : '#ef4444' }}
+          style={{
+            backgroundColor:
+              status === 'connected'  ? '#22c55e' :
+              status === 'connecting' ? '#f59e0b' : '#ef4444',
+          }}
         />
-        <span className="text-xs text-white/30">{status === 'connecting' ? 'Connecting...' : voice.role}</span>
+        <span className="text-xs text-white/30">
+          {status === 'connecting' ? 'Connecting...' : voice.role}
+        </span>
       </motion.div>
 
-      {/* Voice name */}
+      {/* Voice identity */}
       <motion.div
         className="mb-8 text-center"
         initial={{ opacity: 0, y: -10 }}
@@ -122,14 +163,10 @@ function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: Sessio
         <h2 className="text-lg font-medium text-white/50">{voice.name}</h2>
       </motion.div>
 
-      {/* Voice orb */}
-      <VoiceOrb
-        isSpeaking={isSpeaking}
-        speakerName={speakerName}
-        color={voice.color}
-      />
+      {/* Orb */}
+      <VoiceOrb isSpeaking={isSpeaking} speakerName={speakerName} color={voice.color} />
 
-      {/* Last AI message as subtitle */}
+      {/* Last AI message */}
       {lastAiMessage && (
         <motion.p
           className="mt-8 text-sm text-white/25 max-w-sm text-center leading-relaxed"
@@ -137,7 +174,7 @@ function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: Sessio
           animate={{ opacity: 1 }}
           key={lastAiMessage.slice(0, 20)}
         >
-          "{lastAiMessage}"
+          &ldquo;{lastAiMessage}&rdquo;
         </motion.p>
       )}
 
@@ -150,7 +187,8 @@ function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: Sessio
       >
         <button
           onClick={handleEndSession}
-          className="px-6 py-3 rounded-full bg-white/[0.06] text-white/40 hover:bg-white/[0.1] hover:text-white/60 transition-colors text-sm"
+          className="px-6 py-3 rounded-full bg-white/[0.06] text-white/40
+            hover:bg-white/[0.1] hover:text-white/60 transition-colors text-sm"
         >
           End
         </button>

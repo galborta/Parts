@@ -1,0 +1,297 @@
+# Reframe: Parts → Burnout Recovery App
+**Working title:** Recharge (or any name — this is internal reference)
+**Stack:** Keep everything. Next.js + ElevenLabs + Cloudflare Workers + Durable Objects.
+**Format:** Web app first. PWA install for phone. No App Store needed yet.
+
+---
+
+## What This Is
+
+A daily voice coaching app for high performers running below capacity. Three short sessions per day — each one under a minute — that track your recovery across the three dimensions of burnout: energy, meaning, and capability. The app asks one sharp question per session, reflects back in one or two sentences, and builds a longitudinal picture of where you're depleted and what's shifting.
+
+The north star metric is your **Recovery Index** — a single number that moves week over week, built from your scores across three dimensions. That's the one thing you open the app to see improving.
+
+**Target user:** You. Tech founders, finance operators, builders running at high output who don't have time for therapy and don't need it — they need signal on where they're leaking energy and a structured way to address it daily.
+
+---
+
+## Scientific Framework
+
+Based on Christina Maslach's burnout research — the most cited work in occupational psychology, published in peer-reviewed journals and freely referenceable.
+
+**The three dimensions you track:**
+
+| Dimension | What it measures | Voice in the app |
+|---|---|---|
+| Exhaustion | Where energy is going that doesn't feel sustainable | The Energy Audit |
+| Cynicism | Disconnection from meaning, purpose, or people | The Meaning Finder |
+| Efficacy | Sense of competence and impact in your work | The Capability Mirror |
+
+**ACT (Acceptance and Commitment Therapy)** principles remain in the underlying prompt logic — they're already built into the repo and map cleanly to burnout recovery. Keep them as the scaffolding for how questions evolve, don't remove them.
+
+**What you cannot use:** The Maslach Burnout Inventory (MBI) is a copyrighted psychometric test owned by Mind Garden, Inc. Do not reproduce its specific questions. Build your own measurement logic using the three dimensions above — the science is public, the instrument isn't. Attribution line to use anywhere: *"Based on published occupational research from the University of California, Berkeley."*
+
+---
+
+## What Changes in the Repo
+
+### What stays exactly the same
+- All Cloudflare Workers + Durable Objects infrastructure
+- ElevenLabs conversational AI integration (`lib/elevenlabs.ts` structure)
+- Session start / end API routes
+- Streak + session count tracking
+- Auth flow (Google OAuth — add Apple Sign-In before any public launch)
+- i18n (English/Spanish)
+- Three-voice-per-day session architecture
+- 30-second session format — one question in, one reflection out
+- Crisis detection component (reframe copy only)
+- Disclaimer component (reframe copy only)
+
+---
+
+### `lib/types.ts` — Update the data model
+
+Replace ACT dimension score fields with burnout dimension scores.
+
+**Remove:**
+```ts
+selfLeadershipScores: ACTDimensionScores  // 6 ACT dimensions
+miStage: number  // Motivational Interviewing stage 1-4
+```
+
+**Add:**
+```ts
+burnoutScores: {
+  exhaustion: number      // 0-100, lower is better
+  cynicism: number        // 0-100, lower is better
+  efficacy: number        // 0-100, higher is better
+}
+recoveryIndex: number     // composite score, higher is better
+recoveryPhase: 1 | 2 | 3 | 4  // see phases below
+```
+
+The `Part` type gets renamed to `Voice` with three fixed instances (no user-defined parts). The `PartsMap2D` component can be removed or kept for later use.
+
+---
+
+### `lib/elevenlabs.ts` — Rewrite the prompt logic
+
+This is the main content change. The system prompt builder needs to output burnout-specific questions instead of IFS/ACT questions.
+
+**The three voices and what they ask:**
+
+**Voice 1 — The Energy Audit** (exhaustion dimension)
+Asks about where energy is going, what's draining vs. sustaining, what obligations feel owned vs. imposed.
+
+*Sample questions by phase:*
+- Phase 1 (Recognition): "Walk me through yesterday. Where did you feel most drained — not tired, but specifically depleted in a way that felt off?"
+- Phase 2 (Mapping): "What's one recurring thing this week that costs you more than it should?"
+- Phase 3 (Recovery): "What did you protect your energy for this week that actually mattered?"
+- Phase 4 (Resilience): "When did you last feel genuinely restored? What made that possible?"
+
+**Voice 2 — The Meaning Finder** (cynicism dimension)
+Asks about connection to purpose, relationship to the work, what still matters vs. what has gone flat.
+
+*Sample questions by phase:*
+- Phase 1: "When did you last feel like what you were doing actually mattered? How long ago was that?"
+- Phase 2: "What part of your work do you find yourself going through the motions on?"
+- Phase 3: "What happened this week that reminded you why you're doing this?"
+- Phase 4: "What would you build or do differently if you were starting fresh with everything you know now?"
+
+**Voice 3 — The Capability Mirror** (efficacy dimension)
+Asks about competence, impact, and the gap between what you're capable of and what you're currently producing.
+
+*Sample questions by phase:*
+- Phase 1: "What's something you know you're good at that you haven't had a chance to use lately?"
+- Phase 2: "Where do you feel like you're operating below your actual level right now?"
+- Phase 3: "What did you do this week that only you could have done?"
+- Phase 4: "How would someone watching you work this week describe what you're capable of?"
+
+**The evolving phase logic** (replaces MI stages in the current codebase):
+
+| Phase | Session range | Focus |
+|---|---|---|
+| 1 — Recognition | Sessions 1–9 | Name what's happening without judgment |
+| 2 — Mapping | Sessions 10–24 | Identify patterns and triggers |
+| 3 — Recovery | Sessions 25–45 | Build sustainable practices |
+| 4 — Resilience | Sessions 46+ | Operate from a recovered baseline |
+
+The phase advances automatically based on session count, same mechanism as MI stages in the current code — only the thresholds and prompt logic change.
+
+---
+
+### `worker/durable-object.ts` — Update scoring logic
+
+Replace the ACT dimension scoring function with burnout dimension scoring.
+
+The post-session Workers AI scoring call currently classifies answers across 6 ACT dimensions. Replace with:
+
+```
+After each session, score the user's answer on one dimension (whichever voice just ran):
+- Exhaustion score: 0-100 (100 = completely depleted)
+- Cynicism score: 0-100 (100 = fully disconnected from meaning)
+- Efficacy score: 0-100 (100 = fully capable and impactful — reversed scale)
+
+Recovery Index = ((100 - exhaustion) + (100 - cynicism) + efficacy) / 3
+```
+
+The Durable Object stores rolling weekly averages for each dimension so the dashboard can show week-over-week trends.
+
+---
+
+### Dashboard UI — Reframe, don't rebuild
+
+**Remove:**
+- "El Consejo" synthesis (or rename — concept is still valid, just reframe it)
+- Parts Map 2D visualization
+- Self-Leadership Score card with ACT labels
+- All IFS terminology (parts, archetypes, wounds, gifts)
+
+**Keep:**
+- Three session cards per day (same layout)
+- Streak counter
+- Session history with summaries
+- Progress bar for today's completion
+- The synthesis session after all three — rename it "The Signal" — same mechanic, it surfaces patterns from all three voices
+
+**Add:**
+- Recovery Index as the main dashboard number (large, prominent)
+- Three dimension bars showing current exhaustion / cynicism / efficacy scores
+- Weekly trend line for Recovery Index (simple sparkline)
+
+**Language shift throughout the UI:**
+
+| Old (IFS/therapy) | New (performance/coaching) |
+|---|---|
+| Parts | Voices |
+| Inner work | Recovery |
+| Self-leadership | Operating capacity |
+| Wounds / gifts | Drains / strengths |
+| El Consejo | The Signal |
+| Depth level | Recovery phase |
+
+---
+
+## PWA Setup — Install to Phone, Get Notifications
+
+This makes the web app installable on your phone home screen like a native app, with daily push notifications to do your sessions.
+
+### Step 1 — Add `public/manifest.json`
+
+```json
+{
+  "name": "Recharge",
+  "short_name": "Recharge",
+  "description": "Daily voice coaching for high performers",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#0f0c1a",
+  "theme_color": "#0f0c1a",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
+```
+
+Add `<link rel="manifest" href="/manifest.json" />` to `app/layout.tsx`.
+
+### Step 2 — Register a service worker
+
+Create `public/sw.js`:
+
+```js
+self.addEventListener('push', (event) => {
+  const data = event.data?.json() ?? {}
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'Recharge', {
+      body: data.body || 'Your 3 daily sessions are ready.',
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      data: { url: '/dashboard' }
+    })
+  )
+})
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  event.waitUntil(clients.openWindow(event.notification.data.url))
+})
+```
+
+Register it in `app/layout.tsx` or a client component:
+
+```ts
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js')
+}
+```
+
+### Step 3 — Push subscription in the Durable Object
+
+When the user grants notification permission, save their Web Push subscription object to their Durable Object record. The existing DO storage pattern handles this with one new field.
+
+```ts
+// In durable-object.ts, add to user record:
+pushSubscription: PushSubscription | null
+notificationTime: string  // e.g. "08:00" in user's timezone
+```
+
+### Step 4 — Daily notification via Cloudflare Cron Trigger
+
+Add to `wrangler.toml`:
+
+```toml
+[triggers]
+crons = ["0 * * * *"]  // runs every hour, filter by user's preferred time
+```
+
+The Cron Worker iterates users who haven't completed today's sessions and sends a Web Push to their stored subscription using the Web Push API.
+
+### iPhone install instructions (for you right now)
+
+1. Open the app in Safari on your iPhone
+2. Tap the Share button (box with arrow)
+3. Scroll down and tap "Add to Home Screen"
+4. Tap Add
+5. Open the app from your home screen and grant notification permission when prompted
+
+**Note:** On iPhone, Web Push only works for PWAs added to the home screen. It won't work from a Safari browser tab. Once installed, notifications work the same as any native app.
+
+---
+
+## What This Is NOT
+
+To keep the App Store path clean when the time comes:
+
+- Do not use the word "therapy" anywhere in the app or marketing
+- Do not claim to diagnose burnout
+- Do not reference clinical assessment tools by name (MBI)
+- The AI is a **coach**, not a therapist
+- The disclaimer component should read something like: *"Recharge is a coaching tool, not a substitute for medical or mental health care. If you're experiencing a mental health crisis, please contact a professional."*
+
+This positions it cleanly as a Lifestyle app. The science underneath is rigorous — the framing is coaching and performance recovery.
+
+---
+
+## Summary of Files to Touch
+
+| File | Change |
+|---|---|
+| `lib/types.ts` | Replace ACT scores with burnout scores + recovery phase |
+| `lib/elevenlabs.ts` | Rewrite system prompt builder with 3 voices + 4 phases |
+| `lib/voices.ts` | Rename voices to Energy Audit / Meaning Finder / Capability Mirror |
+| `worker/durable-object.ts` | Replace ACT scoring with burnout dimension scoring + Recovery Index |
+| `app/dashboard/page.tsx` | Reframe UI — add Recovery Index, dimension bars, remove Parts Map |
+| `components/SelfLeadershipScore.tsx` | Rename + reframe as Recovery Index component |
+| `components/OnboardingFlow.tsx` | New copy — burnout framing, set notification time |
+| `components/Disclaimer.tsx` | Update copy |
+| `components/CrisisDetection.tsx` | Update copy |
+| `components/PartsMap2D.tsx` | Remove or save for later |
+| `public/manifest.json` | Create new |
+| `public/sw.js` | Create new |
+| `app/layout.tsx` | Add manifest link + service worker registration |
+| `worker/wrangler.toml` | Add Cron Trigger |
+| `lib/i18n.ts` | Update all string keys with new copy |
+
+Everything else in the repo is infrastructure and stays untouched.

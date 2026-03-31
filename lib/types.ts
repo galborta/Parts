@@ -9,75 +9,62 @@ export interface UserMeta {
     completed: boolean;
     currentStep: number;
   };
+  sessionCount: number;
+  streak: number;
+  lastSessionDate: string;
 }
 
-export interface Part {
-  id: string;
-  name: string;
-  archetype: string;
-  voiceId: string;
-  role: string;
-  fear: string;
-  protects: string[];           // IDs of parts this part protects
-  description: string;
-  personality: string;
-  wounds: string[];
-  gifts: string[];
-  dialogueHistory: DialogueTurn[];
-  discoveredAt: string;
-  lastSpokenTo: string;
-  sessionCount: number;
-  unburdened: boolean;
+export type BurnoutDimension = 'exhaustion' | 'cynicism' | 'efficacy';
+
+export interface BurnoutScores {
+  exhaustion: number;   // 0-100, lower is better
+  cynicism: number;     // 0-100, lower is better
+  efficacy: number;     // 0-100, higher is better
 }
+
+// Recovery Index = ((100 - exhaustion) + (100 - cynicism) + efficacy) / 3
+export type RecoveryPhase = 1 | 2 | 3 | 4;
 
 export interface Session {
   id: string;
-  primaryPartId: string;
+  voiceId: string;           // 'energy' | 'meaning' | 'capability'
   startedAt: string;
   endedAt?: string;
   transcript: TranscriptEntry[];
-  insights: string[];
-  selfLeadershipBefore: number;
-  selfLeadershipAfter: number;
   summary?: string;
   duration?: number;
+  dimensionScored?: BurnoutDimension;
+  dimensionScore?: number;
 }
 
 export interface SessionIndexEntry {
   id: string;
   startedAt: string;
-  primaryPartId: string;
+  voiceId: string;
   duration?: number;
   summary?: string;
 }
 
 export interface TranscriptEntry {
-  id: string;
+  id?: string;
   timestamp: string;
-  speaker: 'user' | 'facilitator' | string;  // string = part name
+  speaker: 'user' | 'ai';
   text: string;
-  emotion?: string;
-}
-
-export interface DialogueTurn {
-  speaker: 'user' | 'part' | 'facilitator';
-  text: string;
-  timestamp: string;
-  emotion?: string;
 }
 
 export interface Insight {
   id: string;
   text: string;
-  relatedPartIds: string[];
   surfacedAt: string;
   sessionId: string;
   acknowledged: boolean;
 }
 
 export interface ScoreHistory {
-  current: number;
-  history: { date: string; score: number }[];
+  current: BurnoutScores;
+  recoveryIndex: number;
+  phase: RecoveryPhase;
+  history: { date: string; recoveryIndex: number; scores: BurnoutScores }[];
 }
 
 // ── WebSocket Messages ───────────────────────────────────
@@ -94,7 +81,6 @@ export interface WebSocketResponse {
 
 // ── DO Storage Keys ──────────────────────────────────────
 // 'meta'           → UserMeta
-// 'parts'          → Part[]
 // 'session:{id}'   → Session
 // 'session_index'  → SessionIndexEntry[]
 // 'insights'       → Insight[]

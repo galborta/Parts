@@ -39,6 +39,7 @@ export async function POST(request: Request) {
   let body: any = {};
   try { body = await request.json(); } catch {}
   const language: 'en' | 'es' = body.language || 'en';
+  const voiceIndex: number = body.voiceIndex ?? 0;
 
   // ── Fetch user history from DO ──────────────────────────
   const userId = (session.user as any).id || session.user.email || '';
@@ -72,6 +73,7 @@ export async function POST(request: Request) {
     recentSummaries,
     language,
     userName,
+    voiceIndex,
   });
 
   // ── Get signed URL from ElevenLabs ───────────────────────

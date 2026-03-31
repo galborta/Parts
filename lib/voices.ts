@@ -1,95 +1,56 @@
 /**
- * ElevenLabs Voice ID mapping for IFS archetypes.
- *
- * These are the 6 core archetypes + facilitator.
- * All voices should be multilingual (EN + ES capable).
- *
- * TODO: Replace placeholder IDs with actual ElevenLabs voice IDs
- * from the Voice Library. Pick multilingual voices that support
- * both English and Spanish.
+ * Baseline Voice Configuration
+ * 3 fixed voices mapping to the 3 burnout dimensions.
  */
 
-export interface ArchetypeVoice {
+export interface Voice {
   id: string;
-  label: string;           // Label used in multi-voice XML tags
-  character: string;       // Voice character description
-  voiceId: string;         // ElevenLabs voice ID
+  name: string;
+  role: string;
+  dimension: 'exhaustion' | 'cynicism' | 'efficacy';
+  color: string;
+  icon: string;
+  voiceId: string;   // ElevenLabs voice ID
+  character: string;
 }
 
-// Facilitator voice (default voice on the agent) — Victoria
-export const FACILITATOR_VOICE: ArchetypeVoice = {
-  id: 'facilitator',
-  label: 'Facilitator',
-  character: 'Warm, calm, reassuring — like a trusted therapist',
-  voiceId: 'qSeXEcewz7tA0Q0qk9fH',
-};
+export const VOICES: Voice[] = [
+  {
+    id: 'energy',
+    name: 'Eder',
+    role: 'The Energy Audit',
+    dimension: 'exhaustion',
+    color: '#f59e0b',   // amber
+    icon: '\u26A1',
+    voiceId: 'gSYqSbtMajxq5LUT0bNl',
+    character: 'Direct, focused, no-nonsense — like a sharp operator who sees where energy leaks',
+  },
+  {
+    id: 'meaning',
+    name: 'Mario',
+    role: 'The Meaning Finder',
+    dimension: 'cynicism',
+    color: '#8b5cf6',   // violet
+    icon: '\uD83C\uDFAF',
+    voiceId: 'DZyrV4biPT5EX8YED3PT',
+    character: 'Warm but probing — asks the questions that reconnect you to purpose',
+  },
+  {
+    id: 'capability',
+    name: 'Victoria',
+    role: 'The Capability Mirror',
+    dimension: 'efficacy',
+    color: '#34d399',   // emerald
+    icon: '\uD83D\uDCAA',
+    voiceId: 'qSeXEcewz7tA0Q0qk9fH',
+    character: 'Confident, affirming — reflects your competence back to you',
+  },
+];
 
-// Part archetype voices (additional voices on the agent)
-export const ARCHETYPE_VOICES: Record<string, ArchetypeVoice> = {
-  critic: {
-    id: 'critic',
-    label: 'InnerCritic',
-    character: 'Clipped, precise, slightly cold — male, mature, authoritative',
-    voiceId: 'DZyrV4biPT5EX8YED3PT',  // Mario
-  },
-  perfectionist: {
-    id: 'perfectionist',
-    label: 'Perfectionist',
-    character: 'Fast, anxious, detail-oriented — female, sharp, energetic',
-    voiceId: 'DZyrV4biPT5EX8YED3PT',  // Mario (reused — add unique voice later)
-  },
-  inner_child: {
-    id: 'inner_child',
-    label: 'InnerChild',
-    character: 'Soft, small, vulnerable — young-sounding, gentle',
-    voiceId: 'qSeXEcewz7tA0Q0qk9fH',  // Victoria (reused — add unique voice later)
-  },
-  protector: {
-    id: 'protector',
-    label: 'Protector',
-    character: 'Strong, firm, defensive — deep male, commanding',
-    voiceId: 'gSYqSbtMajxq5LUT0bNl',  // Eder
-  },
-  pleaser: {
-    id: 'pleaser',
-    label: 'Pleaser',
-    character: 'Warm, eager, slightly desperate — female, bright, accommodating',
-    voiceId: 'qSeXEcewz7tA0Q0qk9fH',  // Victoria (reused — add unique voice later)
-  },
-  exile: {
-    id: 'exile',
-    label: 'Exile',
-    character: 'Quiet, fragile, hesitant — whispered, slow, trembling',
-    voiceId: 'gSYqSbtMajxq5LUT0bNl',  // Eder (reused — add unique voice later)
-  },
-};
-
-export const ARCHETYPES = Object.keys(ARCHETYPE_VOICES);
-
-export function getVoiceForArchetype(archetype: string): string {
-  const key = archetype.toLowerCase().replace(/\s+/g, '_');
-  return ARCHETYPE_VOICES[key]?.voiceId || ARCHETYPE_VOICES.protector.voiceId;
+export function getVoiceByIndex(index: number): Voice {
+  return VOICES[index] || VOICES[0];
 }
 
-export function getArchetypeVoice(archetype: string): ArchetypeVoice | undefined {
-  const key = archetype.toLowerCase().replace(/\s+/g, '_');
-  return ARCHETYPE_VOICES[key];
-}
-
-export function getAvailableArchetypes(): string[] {
-  return ARCHETYPES;
-}
-
-/**
- * Build the additional voices config for the ElevenLabs agent.
- * Returns array of { label, voiceId } for the user's parts.
- */
-export function buildAgentVoices(parts: { archetype: string }[]): { label: string; voiceId: string }[] {
-  return parts.map(part => {
-    const voice = getArchetypeVoice(part.archetype);
-    return {
-      label: voice?.label || 'Part',
-      voiceId: voice?.voiceId || ARCHETYPE_VOICES.protector.voiceId,
-    };
-  });
+export function getVoiceById(id: string): Voice | undefined {
+  return VOICES.find((v) => v.id === id);
 }

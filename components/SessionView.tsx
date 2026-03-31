@@ -5,11 +5,7 @@ import { motion } from 'framer-motion';
 import { ConversationProvider, useConversation } from '@elevenlabs/react';
 import VoiceOrb from './VoiceOrb';
 
-const VOICES = [
-  { id: 'observer',       name: 'Eder',     role: 'The Observer',     color: '#f59e0b' },
-  { id: 'challenger',     name: 'Mario',    role: 'The Challenger',   color: '#ef4444' },
-  { id: 'compassionate',  name: 'Victoria', role: 'The Compassionate',color: '#34d399' },
-];
+import { VOICES } from '@/lib/voices';
 
 // Phrases that signal the AI is done — used as fallback if tool doesn't fire
 const CLOSING_PATTERNS = /let that sit|see you next time|until next time|take care|goodbye|good bye|nos vemos|cuídate|closing.*session|end.*session/i;

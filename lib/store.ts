@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Part, SessionIndexEntry, Insight, UserMeta } from './types';
+import type { SessionIndexEntry, Insight, UserMeta } from './types';
 import type { Language } from './i18n';
 
 // ── App Store ────────────────────────────────────────────
@@ -20,24 +20,6 @@ export const useAppStore = create<AppState>((set) => ({
   setMeta: (meta) => set({ meta, language: meta.language, isOnboarded: meta.onboarding.completed }),
   isOnboarded: false,
   setOnboarded: (isOnboarded) => set({ isOnboarded }),
-}));
-
-// ── Parts Store ──────────────────────────────────────────
-
-interface PartsState {
-  parts: Part[];
-  setParts: (parts: Part[]) => void;
-  addPart: (part: Part) => void;
-  selectedPartId: string | null;
-  selectPart: (id: string | null) => void;
-}
-
-export const usePartsStore = create<PartsState>((set) => ({
-  parts: [],
-  setParts: (parts) => set({ parts }),
-  addPart: (part) => set((state) => ({ parts: [...state.parts, part] })),
-  selectedPartId: null,
-  selectPart: (selectedPartId) => set({ selectedPartId }),
 }));
 
 // ── Session Store ────────────────────────────────────────
@@ -71,13 +53,13 @@ export const useSessionStore = create<SessionState>((set) => ({
 interface InsightsState {
   insights: Insight[];
   setInsights: (insights: Insight[]) => void;
-  selfLeadershipScore: number;
-  setSelfLeadershipScore: (score: number) => void;
+  recoveryIndex: number;
+  setRecoveryIndex: (score: number) => void;
 }
 
 export const useInsightsStore = create<InsightsState>((set) => ({
   insights: [],
   setInsights: (insights) => set({ insights }),
-  selfLeadershipScore: 0,
-  setSelfLeadershipScore: (selfLeadershipScore) => set({ selfLeadershipScore }),
+  recoveryIndex: 0,
+  setRecoveryIndex: (recoveryIndex) => set({ recoveryIndex }),
 }));

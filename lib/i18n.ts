@@ -1,105 +1,92 @@
 const strings = {
   en: {
     // Landing
-    tagline: 'Talk to Your Inner Parts.',
-    taglineSub: 'Hear Them Talk Back.',
-    subtitle: 'An IFS therapy companion powered by ElevenLabs voice AI',
+    tagline: 'Recover Your Baseline.',
+    taglineSub: 'Three Sessions a Day.',
+    subtitle: 'Voice coaching for high performers running below capacity',
     signIn: 'Sign in with Google',
 
     // Language selector
     chooseLanguage: 'Choose your language',
     english: 'English',
-    spanish: 'Español',
+    spanish: 'Espanol',
 
     // Onboarding
-    onboardingTitle: 'Welcome to Parts',
-    onboardingIntro: 'Your mind is naturally multiple. You have different parts — an inner critic, a protector, an inner child. Each has its own voice, its own fears, its own gifts.',
-    onboardingExplain: 'In IFS (Internal Family Systems) therapy, you turn toward these parts with curiosity instead of judgment. Parts helps you do exactly that — with AI voices that bring each part to life.',
-    onboardingReady: "Let's meet your first part",
-    nameYourPart: 'Name your first part',
-    partNamePlaceholder: 'e.g., The Critic, Little Me, The Guard...',
-    chooseArchetype: 'What kind of part is this?',
-    continue: 'Continue',
-    startExploring: 'Start Exploring',
+    onboardingTitle: 'Welcome to Baseline',
+    onboardingIntro: 'Burnout has three dimensions: exhaustion, cynicism, and reduced efficacy. Most people only notice the first one. Baseline tracks all three.',
+    onboardingExplain: 'Every day, three short voice sessions check in on your energy, your connection to meaning, and your sense of capability. Under a minute each. Real signal, not guesswork.',
+    onboardingReady: "Let's begin",
 
-    // Archetypes
-    archetype_critic: 'Inner Critic',
-    archetype_critic_desc: 'The voice that tells you you\'re not enough',
-    archetype_perfectionist: 'Perfectionist',
-    archetype_perfectionist_desc: 'Driven by the need to get everything right',
-    archetype_inner_child: 'Inner Child',
-    archetype_inner_child_desc: 'The young, vulnerable part that holds old wounds',
-    archetype_protector: 'Protector',
-    archetype_protector_desc: 'Keeps you safe by building walls',
-    archetype_pleaser: 'Pleaser',
-    archetype_pleaser_desc: 'Seeks approval and avoids conflict at all costs',
-    archetype_exile: 'Exile',
-    archetype_exile_desc: 'Hidden away — carries the deepest pain',
+    // Voices
+    voice_energy: 'The Energy Audit',
+    voice_energy_desc: 'Where is your energy going?',
+    voice_meaning: 'The Meaning Finder',
+    voice_meaning_desc: 'What still matters to you?',
+    voice_capability: 'The Capability Mirror',
+    voice_capability_desc: 'What are you actually capable of?',
 
     // Session
     startSession: 'Start Session',
     endSession: 'End Session',
     speaking: 'Speaking...',
     listening: 'Listening...',
-    sessionWith: 'Session with',
 
     // Dashboard
-    yourParts: 'Your Parts',
-    newPart: '+ New Part',
+    recoveryIndex: 'Recovery Index',
     sessions: 'Sessions',
-    insights: 'Insights',
-    selfLeadership: 'Self-Leadership',
+    streak: 'Streak',
+    phase: 'Phase',
+    theSignal: 'The Signal',
+    recentSessions: 'Recent Sessions',
+
+    // Dimensions
+    exhaustion: 'Exhaustion',
+    cynicism: 'Cynicism',
+    efficacy: 'Efficacy',
 
     // Disclaimer
-    disclaimer: 'Parts is not therapy and is not a replacement for professional mental health care.',
+    disclaimer: 'Baseline is a coaching tool, not a substitute for medical or mental health care.',
   },
 
   es: {
-    tagline: 'Habla con Tus Partes Internas.',
-    taglineSub: 'Escúchalas Responder.',
-    subtitle: 'Un compañero de terapia IFS impulsado por ElevenLabs',
-    signIn: 'Iniciar sesión con Google',
+    tagline: 'Recupera Tu Baseline.',
+    taglineSub: 'Tres Sesiones al Dia.',
+    subtitle: 'Coaching por voz para personas de alto rendimiento',
+    signIn: 'Iniciar sesion con Google',
 
     chooseLanguage: 'Elige tu idioma',
     english: 'English',
-    spanish: 'Español',
+    spanish: 'Espanol',
 
-    onboardingTitle: 'Bienvenido a Parts',
-    onboardingIntro: 'Tu mente es naturalmente múltiple. Tienes diferentes partes — un crítico interno, un protector, un niño interior. Cada una tiene su propia voz, sus propios miedos, sus propios dones.',
-    onboardingExplain: 'En la terapia IFS (Sistemas Familiares Internos), te acercas a estas partes con curiosidad en vez de juicio. Parts te ayuda a hacer exactamente eso — con voces de IA que dan vida a cada parte.',
-    onboardingReady: 'Conozcamos tu primera parte',
-    nameYourPart: 'Nombra tu primera parte',
-    partNamePlaceholder: 'ej., El Crítico, Mi Niño Interior, El Guardián...',
-    chooseArchetype: '¿Qué tipo de parte es?',
-    continue: 'Continuar',
-    startExploring: 'Comenzar a Explorar',
+    onboardingTitle: 'Bienvenido a Baseline',
+    onboardingIntro: 'El burnout tiene tres dimensiones: agotamiento, cinismo y eficacia reducida. La mayoria solo nota la primera. Baseline rastrea las tres.',
+    onboardingExplain: 'Cada dia, tres sesiones cortas de voz revisan tu energia, tu conexion con el proposito y tu sentido de capacidad. Menos de un minuto cada una.',
+    onboardingReady: 'Comencemos',
 
-    archetype_critic: 'Crítico Interno',
-    archetype_critic_desc: 'La voz que te dice que no eres suficiente',
-    archetype_perfectionist: 'Perfeccionista',
-    archetype_perfectionist_desc: 'Impulsado por la necesidad de hacerlo todo perfecto',
-    archetype_inner_child: 'Niño Interior',
-    archetype_inner_child_desc: 'La parte joven y vulnerable que guarda heridas antiguas',
-    archetype_protector: 'Protector',
-    archetype_protector_desc: 'Te mantiene a salvo construyendo muros',
-    archetype_pleaser: 'Complaciente',
-    archetype_pleaser_desc: 'Busca aprobación y evita el conflicto a toda costa',
-    archetype_exile: 'Exiliado',
-    archetype_exile_desc: 'Escondido — carga el dolor más profundo',
+    voice_energy: 'Auditoria de Energia',
+    voice_energy_desc: 'Donde se va tu energia?',
+    voice_meaning: 'El Buscador de Sentido',
+    voice_meaning_desc: 'Que todavia te importa?',
+    voice_capability: 'El Espejo de Capacidad',
+    voice_capability_desc: 'De que eres realmente capaz?',
 
-    startSession: 'Iniciar Sesión',
-    endSession: 'Terminar Sesión',
+    startSession: 'Iniciar Sesion',
+    endSession: 'Terminar Sesion',
     speaking: 'Hablando...',
     listening: 'Escuchando...',
-    sessionWith: 'Sesión con',
 
-    yourParts: 'Tus Partes',
-    newPart: '+ Nueva Parte',
+    recoveryIndex: 'Indice de Recuperacion',
     sessions: 'Sesiones',
-    insights: 'Descubrimientos',
-    selfLeadership: 'Auto-Liderazgo',
+    streak: 'Racha',
+    phase: 'Fase',
+    theSignal: 'La Senal',
+    recentSessions: 'Sesiones Recientes',
 
-    disclaimer: 'Parts no es terapia y no reemplaza la atención profesional de salud mental.',
+    exhaustion: 'Agotamiento',
+    cynicism: 'Cinismo',
+    efficacy: 'Eficacia',
+
+    disclaimer: 'Baseline es una herramienta de coaching, no un sustituto de atencion medica o de salud mental.',
   },
 } as const;
 
@@ -108,15 +95,4 @@ export type StringKey = keyof typeof strings.en;
 
 export function t(key: StringKey, lang: Language = 'en'): string {
   return strings[lang][key] || strings.en[key] || key;
-}
-
-export function getArchetypeOptions(lang: Language = 'en') {
-  return [
-    { id: 'critic', name: t('archetype_critic', lang), description: t('archetype_critic_desc', lang) },
-    { id: 'perfectionist', name: t('archetype_perfectionist', lang), description: t('archetype_perfectionist_desc', lang) },
-    { id: 'inner_child', name: t('archetype_inner_child', lang), description: t('archetype_inner_child_desc', lang) },
-    { id: 'protector', name: t('archetype_protector', lang), description: t('archetype_protector_desc', lang) },
-    { id: 'pleaser', name: t('archetype_pleaser', lang), description: t('archetype_pleaser_desc', lang) },
-    { id: 'exile', name: t('archetype_exile', lang), description: t('archetype_exile_desc', lang) },
-  ];
 }

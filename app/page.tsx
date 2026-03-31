@@ -15,9 +15,9 @@ export default function Home() {
 
   if (status === 'loading') {
     return (
-      <div className="min-h-screen w-full bg-[#080f0b] flex items-center justify-center">
+      <div className="min-h-screen w-full bg-[#0f0c1a] flex items-center justify-center">
         <motion.div
-          className="w-10 h-10 rounded-full border-2 border-emerald-500/30 border-t-emerald-400"
+          className="w-10 h-10 rounded-full border-2 border-violet-500/30 border-t-violet-400"
           animate={{ rotate: 360 }}
           transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
         />
@@ -26,12 +26,12 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen w-full bg-[#080f0b] relative overflow-hidden">
+    <div className="min-h-screen w-full bg-[#0f0c1a] relative overflow-hidden">
       {/* Background */}
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute -top-40 -left-40 w-[500px] h-[500px] bg-emerald-600/[0.07] rounded-full blur-[120px] animate-float" />
-        <div className="absolute -bottom-40 -right-40 w-[600px] h-[600px] bg-teal-600/[0.05] rounded-full blur-[120px] animate-float-delayed" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,#080f0b_70%)]" />
+        <div className="absolute -top-40 -left-40 w-[500px] h-[500px] bg-violet-600/[0.07] rounded-full blur-[120px] animate-float" />
+        <div className="absolute -bottom-40 -right-40 w-[600px] h-[600px] bg-amber-600/[0.05] rounded-full blur-[120px] animate-float-delayed" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,#0f0c1a_70%)]" />
       </div>
 
       {/* Nav */}
@@ -41,10 +41,10 @@ export default function Home() {
         animate={{ opacity: 1, y: 0 }}
       >
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white text-sm font-bold">
-            P
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-amber-500 flex items-center justify-center text-white text-sm font-bold">
+            B
           </div>
-          <span className="text-lg font-semibold text-white/90">Parts</span>
+          <span className="text-lg font-semibold text-white/90">Baseline</span>
         </div>
       </motion.nav>
 
@@ -62,8 +62,8 @@ export default function Home() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
           >
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-xs text-white/40">3 quick sessions a day. Real progress.</span>
+            <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+            <span className="text-xs text-white/40">3 quick sessions a day. Real recovery.</span>
           </motion.div>
 
           {/* Heading */}
@@ -73,9 +73,9 @@ export default function Home() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
           >
-            <span className="text-white">Know yourself</span>
+            <span className="text-white">Recover your</span>
             <br />
-            <span className="gradient-text">one session at a time.</span>
+            <span className="gradient-text">baseline.</span>
           </motion.h1>
 
           <motion.p
@@ -84,8 +84,9 @@ export default function Home() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
           >
-            Every day, Parts guides you through 3 short voice sessions that help you understand
-            your inner world. Quick conversations. Real insights. Visible growth.
+            Burnout has three dimensions. Most people only track one.
+            Baseline measures all three — energy, meaning, and capability — through
+            short daily voice sessions.
           </motion.p>
 
           <motion.p
@@ -94,7 +95,7 @@ export default function Home() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.5 }}
           >
-            Based on Motivational Interviewing + ACT — evidence-based methodologies
+            Based on published occupational research from the University of California, Berkeley
           </motion.p>
 
           {/* CTA */}
@@ -118,7 +119,7 @@ export default function Home() {
               </svg>
               Start with Google
             </motion.button>
-            <p className="text-xs text-white/10">Free. Takes 2 minutes a day.</p>
+            <p className="text-xs text-white/10">Free. Under 3 minutes a day.</p>
           </motion.div>
         </motion.div>
 
@@ -130,15 +131,18 @@ export default function Home() {
           transition={{ delay: 0.8 }}
         >
           {[
-            { num: '1', text: 'Listen to a question' },
-            { num: '2', text: 'Speak your answer' },
-            { num: '3', text: 'See your insight' },
+            { num: '1', text: 'Energy Audit', sub: 'Where is it going?' },
+            { num: '2', text: 'Meaning Finder', sub: 'What still matters?' },
+            { num: '3', text: 'Capability Mirror', sub: 'What can you do?' },
           ].map((step) => (
             <div key={step.num} className="flex items-center gap-3 glass rounded-xl px-4 py-3 flex-1">
-              <div className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold flex items-center justify-center shrink-0">
+              <div className="w-6 h-6 rounded-full bg-violet-500/20 text-violet-400 text-xs font-bold flex items-center justify-center shrink-0">
                 {step.num}
               </div>
-              <span className="text-sm text-white/30">{step.text}</span>
+              <div>
+                <span className="text-sm text-white/30 block">{step.text}</span>
+                <span className="text-[10px] text-white/15">{step.sub}</span>
+              </div>
             </div>
           ))}
         </motion.div>

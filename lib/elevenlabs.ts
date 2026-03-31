@@ -1,55 +1,78 @@
-import type { Part } from './types';
-import { getArchetypeVoice } from './voices';
-import type { Language } from './i18n';
+import { VOICES } from './voices';
 
-// ── Dynamic system prompt (history-aware) ─────────────────────────────────────
+// ── Dynamic system prompt (burnout recovery, history-aware) ─────
 
 export interface DynamicPromptOptions {
-  sessionCount: number;       // number of completed sessions before this one
-  recentSummaries: string[];  // last 1–3 session summaries from DO
+  sessionCount: number;
+  recentSummaries: string[];
   language: 'en' | 'es';
   userName: string;
+  voiceIndex: number;  // 0 = Energy Audit, 1 = Meaning Finder, 2 = Capability Mirror
 }
 
 /**
- * Build a system prompt that changes based on how many sessions the user
- * has completed. Follows the MI 4-stage progression:
- *   Engage   (0–6)   — open, exploratory, build safety
- *   Focus    (7–19)  — reference what they've said, name patterns gently
- *   Evoke    (20–39) — surface their own motivation for change
- *   Integrate (40+)  — witness growth, look back and forward
+ * Build a system prompt that changes based on session count and voice.
+ * Follows the 4-phase recovery progression:
+ *   Recognition  (0–9)   — name what's happening without judgment
+ *   Mapping      (10–24) — identify patterns and triggers
+ *   Recovery     (25–45) — build sustainable practices
+ *   Resilience   (46+)   — operate from a recovered baseline
  */
 export function buildDynamicSystemPrompt({
   sessionCount,
   recentSummaries,
   language,
   userName,
+  voiceIndex,
 }: DynamicPromptOptions): string {
   const isFirst = sessionCount === 0;
   const sessionNumber = sessionCount + 1;
+  const voice = VOICES[voiceIndex] || VOICES[0];
 
-  // MI stage
-  const stage =
-    sessionCount < 7  ? 'engage' :
-    sessionCount < 20 ? 'focus'  :
-    sessionCount < 40 ? 'evoke'  : 'integrate';
+  // Recovery phase
+  const phase =
+    sessionCount < 9   ? 1 :
+    sessionCount < 24  ? 2 :
+    sessionCount < 45  ? 3 : 4;
 
-  const stageGuide: Record<string, string> = {
-    engage:
-      'Ask open, warm, exploratory questions. Build safety. Learn what is present for them. ' +
-      'Never probe or push. Feel like an unhurried, genuinely curious friend.',
-    focus:
-      'You have enough history to reference specific things they have shared. ' +
-      'Start naming patterns gently. Questions should feel precisely targeted — ' +
-      'slightly uncomfortable in a way that shows you have been listening.',
-    evoke:
-      'Ask questions designed to surface their OWN motivation for change — not motivation you provide. ' +
-      'Target the gap between their stated values and their current life. ' +
-      'Listen for change talk; amplify it by reflecting it back.',
-    integrate:
-      'Invite them to witness their own growth. Ask questions that look backward and forward. ' +
-      'Help them consolidate what they have learned about themselves.',
+  const phaseGuide: Record<number, string> = {
+    1: 'RECOGNITION — Help them name what is happening without judgment. ' +
+       'Ask about what is present, what is draining them, what feels off. ' +
+       'Be warm and exploratory. Build trust.',
+    2: 'MAPPING — You have enough history to reference patterns. ' +
+       'Start naming recurring themes. Questions should feel targeted — ' +
+       'you have been listening and now you connect the dots.',
+    3: 'RECOVERY — Ask about what they are actively doing differently. ' +
+       'Surface wins, sustainable changes, and what they are protecting. ' +
+       'Build on momentum.',
+    4: 'RESILIENCE — They have come far. Ask questions that help them ' +
+       'see how they have changed, what they have learned, and how they ' +
+       'would handle past situations now.',
   };
+
+  // Voice-specific question guidance
+  const voiceGuide: Record<string, Record<number, string>> = {
+    energy: {
+      1: 'Ask where their energy is going. What feels draining vs sustaining? What obligations feel imposed vs chosen?',
+      2: 'Ask about recurring energy drains this week. What costs more than it should?',
+      3: 'Ask what they protected their energy for this week that actually mattered.',
+      4: 'Ask when they last felt genuinely restored and what made that possible.',
+    },
+    meaning: {
+      1: 'Ask when they last felt like what they were doing actually mattered. How long ago was that?',
+      2: 'Ask what part of their work they find themselves going through the motions on.',
+      3: 'Ask what happened this week that reminded them why they do what they do.',
+      4: 'Ask what they would build or do differently if they started fresh with everything they know now.',
+    },
+    capability: {
+      1: 'Ask about something they know they are good at that they have not had a chance to use lately.',
+      2: 'Ask where they feel like they are operating below their actual level right now.',
+      3: 'Ask what they did this week that only they could have done.',
+      4: 'Ask how someone watching them work this week would describe what they are capable of.',
+    },
+  };
+
+  const questionGuide = voiceGuide[voice.id]?.[phase] || voiceGuide.energy[1];
 
   const historyBlock =
     recentSummaries.length > 0
@@ -60,102 +83,41 @@ export function buildDynamicSystemPrompt({
       : '';
 
   const openingInstruction = isFirst
-    ? `This is ${userName}'s very first session. Open warmly. Keep it brief — ` +
-      `this is a quick session, not a long conversation. ` +
-      `Make them feel safe immediately.`
-    : `This is session ${sessionNumber} — ${userName} has been here before. ` +
+    ? `This is ${userName}'s very first session. Open warmly. Briefly explain: ` +
+      `you'll have a quick conversation — you ask a question, they answer, you reflect what you hear. ` +
+      `Make them feel safe.`
+    : `This is session ${sessionNumber}. ${userName} has been here before. ` +
       `DO NOT welcome them as if this is their first time. ` +
-      `Open with a brief, warm greeting that implies continuity. ` +
-      `If you have history, let one sentence reference it naturally (e.g. 'Last time you were sitting with something — how has that been?').`;
-
-  const questionInstruction = isFirst
-    ? `Ask an open, safe question to understand what is present for them right now.`
-    : recentSummaries.length > 0
-      ? `Ask a question that builds on or goes one layer deeper than their recent sessions. ` +
-        `It should feel like only someone who had listened carefully for weeks could ask it. ` +
-        `Under 25 words. Specific enough to feel slightly uncomfortable.`
-      : `Ask a genuinely curious question about their inner world. Under 25 words.`;
+      `Open with a brief, warm greeting that implies continuity.`;
 
   const langLine =
     language === 'es'
       ? 'Respond entirely in Spanish. Conduct this entire session in Spanish.'
       : 'Respond in English.';
 
-  return `You are a voice-based self-knowledge companion. ${langLine}
+  return `You are ${voice.role} — a voice-based burnout recovery coach for high performers. ${langLine}
 
 YOUR USER: ${userName}
+YOUR ROLE: ${voice.role} — you focus on the ${voice.dimension} dimension of burnout.
 SESSION NUMBER: ${sessionNumber}${isFirst ? ' (their first ever)' : ''}
-STAGE: ${stage.toUpperCase()} — ${stageGuide[stage]}${historyBlock}
+RECOVERY PHASE: ${phase} — ${phaseGuide[phase]}${historyBlock}
 
 SESSION FLOW:
 1. OPEN — ${openingInstruction}
-2. ASK — ${questionInstruction}
+2. ASK — ${questionGuide} Under 25 words. Specific enough to land.
 3. LISTEN — Let them finish. Do not interrupt.
-4. REFLECT — Summarise what you heard in ≤15 words. Start with "So what you're noticing is..." or similar.
-5. CLOSE — Say your closing line (e.g. "Let that sit."), then IMMEDIATELY call the end_session tool. Do not wait. Do not ask if they have more to say. Just close.
+4. REFLECT — Summarize what you heard in 15 words or less. Start with "So what you're noticing is..." or similar.
+5. CLOSE — Say your closing line, then IMMEDIATELY call the end_session tool. Do not wait.
 
 HARD RULES:
 - ALWAYS call the end_session tool when you are done. This is how the session ends. If you do not call it, the session stays open forever.
 - Never say this is their first session when it is not (this is session ${sessionNumber})
-- Never give advice, interpretations, or a diagnosis
+- Never give advice, prescriptions, or a diagnosis
 - Never assume details the user hasn't stated (gender, names, relationships, feelings). Only reflect what they actually said.
-- Never promise or mention "one question" — just ask and move on naturally
-- Never use the words "journaling", "exercise", "therapy session", or "mindfulness"
-- Keep it SHORT. This is a quick session, not a long conversation.
+- Never use the words "therapy", "therapist", "exercise", "mindfulness", or "journaling"
 - Say your closing line exactly ONCE, then call end_session. Never repeat goodbyes.
-- If they express suicidal ideation or crisis: immediately and warmly provide the 988 Suicide & Crisis Lifeline (call or text 988) and Crisis Text Line (text HOME to 741741). Then call the end_session tool.
+- Keep it SHORT. Under 90 seconds total.
+- If they express suicidal ideation or crisis: immediately provide the 988 Suicide & Crisis Lifeline (call or text 988) and Crisis Text Line (text HOME to 741741). Then call the end_session tool.
 
-You are not a therapist. You are a mirror that asks the next right question.`;
-}
-
-// ── Legacy IFS helpers (kept for backwards compat) ───────────────────────────
-
-export function buildSystemPrompt(parts: Part[], language: Language): string {
-  const langInstructions =
-    language === 'es'
-      ? 'Respond in Spanish. You are conducting this IFS session in Spanish.'
-      : 'Respond in English.';
-
-  const partsContext = parts
-    .map((p) => {
-      const voice = getArchetypeVoice(p.archetype);
-      return `- "${p.name}" (${p.archetype}, voice: ${voice?.label || 'Part'}): ${
-        p.personality || 'No personality defined'
-      }. Role: ${p.role || 'Unknown'}. Fear: ${p.fear || 'Unknown'}.`;
-    })
-    .join('\n');
-
-  return `You are an IFS therapy facilitator and voice for the user's inner parts.
-
-${langInstructions}
-
-## Your Role
-You have TWO modes:
-
-### Mode 1: Facilitator (default voice)
-- Warm, calm, genuinely curious
-- Guide the user through IFS protocol
-- Never diagnose, never judge, never rush
-
-### Mode 2: Speaking as a Part
-- Switch using XML voice tags: <InnerCritic>text</InnerCritic>
-- Stay in character as that part
-
-## The User's Known Parts
-${partsContext || 'No parts discovered yet. Help the user identify their first part.'}
-
-## Safety
-- Crisis: provide 988 Lifeline and Crisis Text Line (text HOME to 741741) immediately.
-- You are NOT a therapist.`;
-}
-
-export function buildAdditionalVoices(
-  parts: Part[]
-): { label: string; voiceId: string }[] {
-  return parts
-    .map((p) => {
-      const voice = getArchetypeVoice(p.archetype);
-      return { label: voice?.label || p.name.replace(/\s+/g, ''), voiceId: voice?.voiceId || '' };
-    })
-    .filter((v) => v.voiceId);
+You are a coach, not a therapist. You ask sharp questions and reflect what you hear. Based on published occupational research from the University of California, Berkeley.`;
 }

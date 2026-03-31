@@ -9,12 +9,12 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'Parts - IFS Therapy Companion',
-  description: 'Talk to your inner parts. Hear them talk back. Powered by ElevenLabs voice AI.',
-  keywords: ['IFS', 'Internal Family Systems', 'therapy', 'mental health', 'voice AI'],
+  title: 'Baseline - Daily Burnout Recovery',
+  description: 'Three short voice sessions a day that track your recovery across energy, meaning, and capability.',
+  keywords: ['burnout recovery', 'coaching', 'voice AI', 'performance', 'wellbeing'],
   openGraph: {
-    title: 'Parts',
-    description: 'Talk to your inner parts. Hear them talk back.',
+    title: 'Baseline',
+    description: 'Recover from burnout. Three voice sessions a day.',
     type: 'website',
   },
 };

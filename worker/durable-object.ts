@@ -1,10 +1,9 @@
 /**
- * UserPsyche Durable Object
- * One per user — persistent psyche at the edge
+ * Baseline Durable Object
+ * One per user — persistent recovery data at the edge
  *
  * Storage keys:
  * - 'meta'           → UserMeta
- * - 'parts'          → Part[]
  * - 'session:{id}'   → Session
  * - 'session_index'  → SessionIndexEntry[]
  * - 'insights'       → Insight[]
@@ -12,20 +11,6 @@
  */
 
 import { DurableObject } from 'cloudflare:workers';
-
-const ARCHETYPE_VOICE_IDS: Record<string, string> = {
-  critic:       'DZyrV4biPT5EX8YED3PT',
-  perfectionist:'DZyrV4biPT5EX8YED3PT',
-  inner_child:  'qSeXEcewz7tA0Q0qk9fH',
-  protector:    'gSYqSbtMajxq5LUT0bNl',
-  pleaser:      'qSeXEcewz7tA0Q0qk9fH',
-  exile:        'gSYqSbtMajxq5LUT0bNl',
-};
-
-function getVoiceForArchetype(archetype: string): string {
-  const key = archetype.toLowerCase().replace(/\s+/g, '_');
-  return ARCHETYPE_VOICE_IDS[key] || ARCHETYPE_VOICE_IDS.protector;
-}
 
 interface UserMeta {
   userId: string;
@@ -35,34 +20,15 @@ interface UserMeta {
   onboarding: { completed: boolean; currentStep: number };
   sessionCount: number;
   streak: number;
-  lastSessionDate: string; // YYYY-MM-DD
-}
-
-interface Part {
-  id: string;
-  name: string;
-  archetype: string;
-  voiceId: string;
-  role: string;
-  fear: string;
-  protects: string[];
-  description: string;
-  personality: string;
-  wounds: string[];
-  gifts: string[];
-  dialogueHistory: any[];
-  discoveredAt: string;
-  lastSpokenTo: string;
-  sessionCount: number;
-  unburdened: boolean;
+  lastSessionDate: string;
 }
 
 interface SessionIndexEntry {
   id: string;
   startedAt: string;
-  primaryPartId: string;
+  voiceId: string;
   duration?: number;
-  summary?: string;  // ← persisted after session/end or session/summary
+  summary?: string;
 }
 
 interface Env {
@@ -80,8 +46,6 @@ export class UserPsyche extends DurableObject<Env> {
 
     if (pathname === '/api/init'             && request.method === 'POST')  return this.handleInit(request);
     if (pathname === '/api/meta'             && request.method === 'GET')   return this.handleGetMeta();
-    if (pathname === '/api/parts'            && request.method === 'GET')   return this.handleGetParts();
-    if (pathname === '/api/parts'            && request.method === 'POST')  return this.handleAddPart(request);
     if (pathname === '/api/language'         && request.method === 'PATCH') return this.handleUpdateLanguage(request);
     if (pathname === '/api/session/start'    && request.method === 'POST')  return this.handleStartSession(request);
     if (pathname === '/api/session/end'      && request.method === 'POST')  return this.handleEndSession(request);
@@ -89,7 +53,7 @@ export class UserPsyche extends DurableObject<Env> {
     if (pathname === '/api/sessions'         && request.method === 'GET')   return this.handleGetSessions();
     if (pathname === '/api/insights'         && request.method === 'GET')   return this.handleGetInsights();
     if (pathname === '/api/progress'         && request.method === 'GET')   return this.handleGetProgress();
-    if (pathname === '/api/reset'              && request.method === 'POST')  return this.handleReset();
+    if (pathname === '/api/reset'            && request.method === 'POST')  return this.handleReset();
     if (pathname === '/api/onboarding/complete' && request.method === 'POST') return this.handleCompleteOnboarding();
 
     return Response.json({ error: 'Not found' }, { status: 404 });
@@ -134,8 +98,7 @@ export class UserPsyche extends DurableObject<Env> {
         needsSave = true;
       }
       if (needsSave) await this.ctx.storage.put('meta', existing);
-      const parts = await this.ctx.storage.get('parts') as Part[] || [];
-      return Response.json({ status: 'already_initialized', meta: existing, parts });
+      return Response.json({ status: 'already_initialized', meta: existing });
     }
     const meta: UserMeta = {
       userId, email,
@@ -147,11 +110,10 @@ export class UserPsyche extends DurableObject<Env> {
       lastSessionDate: '',
     };
     await this.ctx.storage.put('meta', meta);
-    await this.ctx.storage.put('parts', []);
     await this.ctx.storage.put('session_index', []);
     await this.ctx.storage.put('insights', []);
-    await this.ctx.storage.put('score', { current: 0, history: [] });
-    return Response.json({ status: 'initialized', meta, parts: [] });
+    await this.ctx.storage.put('score', { current: { exhaustion: 50, cynicism: 50, efficacy: 50 }, recoveryIndex: 50, phase: 1, history: [] });
+    return Response.json({ status: 'initialized', meta });
   }
 
   // ── Meta ──────────────────────────────────────────────────
@@ -171,52 +133,18 @@ export class UserPsyche extends DurableObject<Env> {
     return Response.json({ meta });
   }
 
-  // ── Parts ─────────────────────────────────────────────────
-  private async handleGetParts(): Promise<Response> {
-    const parts = await this.ctx.storage.get('parts') as Part[] || [];
-    return Response.json({ parts });
-  }
-
-  private async handleAddPart(request: Request): Promise<Response> {
-    const { name, archetype, description, personality, role, fear } = await request.json() as any;
-    const parts = await this.ctx.storage.get('parts') as Part[] || [];
-    const newPart: Part = {
-      id: crypto.randomUUID(),
-      name, archetype,
-      voiceId: getVoiceForArchetype(archetype),
-      role: role || '',
-      fear: fear || '',
-      protects: [],
-      description: description || '',
-      personality: personality || '',
-      wounds: [], gifts: [],
-      dialogueHistory: [],
-      discoveredAt: new Date().toISOString(),
-      lastSpokenTo: '',
-      sessionCount: 0,
-      unburdened: false,
-    };
-    parts.push(newPart);
-    await this.ctx.storage.put('parts', parts);
-    return Response.json({ part: newPart }, { status: 201 });
-  }
-
   // ── Sessions ──────────────────────────────────────────────
   private async handleStartSession(request: Request): Promise<Response> {
     const { primaryPartId } = await request.json() as any;
-    const score = await this.ctx.storage.get('score') as any || { current: 0, history: [] };
     const session = {
       id: crypto.randomUUID(),
-      primaryPartId: primaryPartId || 'free',
+      voiceId: primaryPartId || 'free',
       startedAt: new Date().toISOString(),
       transcript: [],
-      insights: [],
-      selfLeadershipBefore: score.current,
-      selfLeadershipAfter: score.current,
     };
     await this.ctx.storage.put(`session:${session.id}`, session);
     const index = await this.ctx.storage.get('session_index') as SessionIndexEntry[] || [];
-    index.push({ id: session.id, startedAt: session.startedAt, primaryPartId: session.primaryPartId });
+    index.push({ id: session.id, startedAt: session.startedAt, voiceId: session.voiceId });
     await this.ctx.storage.put('session_index', index);
     return Response.json({ session }, { status: 201 });
   }
@@ -241,21 +169,11 @@ export class UserPsyche extends DurableObject<Env> {
       await this.ctx.storage.put('session_index', index);
     }
 
-    // Update part stats
-    const parts = await this.ctx.storage.get('parts') as Part[] || [];
-    const part = parts.find((p) => p.id === session.primaryPartId);
-    if (part) {
-      part.sessionCount++;
-      part.lastSpokenTo = new Date().toISOString();
-      await this.ctx.storage.put('parts', parts);
-    }
-
     // Update meta: sessionCount, streak, lastSessionDate
     const meta = await this.ctx.storage.get('meta') as UserMeta | undefined;
     if (meta) {
-      const todayStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      const todayStr = new Date().toISOString().slice(0, 10);
       if (meta.lastSessionDate !== todayStr) {
-        // First session of the day — check streak
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
         const yesterdayStr = yesterday.toISOString().slice(0, 10);
@@ -269,10 +187,6 @@ export class UserPsyche extends DurableObject<Env> {
     return Response.json({ session });
   }
 
-  /**
-   * Persist a summary string into the session index entry.
-   * Called by session/end Next.js route after the session is saved.
-   */
   private async handleSaveSessionSummary(request: Request): Promise<Response> {
     const { sessionId, summary } = await request.json() as { sessionId: string; summary: string };
     const index = await this.ctx.storage.get('session_index') as SessionIndexEntry[] || [];
@@ -281,7 +195,6 @@ export class UserPsyche extends DurableObject<Env> {
       entry.summary = summary;
       await this.ctx.storage.put('session_index', index);
     }
-    // Also update the full session record
     const session = await this.ctx.storage.get(`session:${sessionId}`) as any;
     if (session && summary) {
       session.summary = summary;
@@ -306,15 +219,12 @@ export class UserPsyche extends DurableObject<Env> {
     const meta = await this.ctx.storage.get('meta') as UserMeta | undefined;
     if (!meta) return Response.json({ error: 'User not initialized' }, { status: 404 });
 
-    // session_index is the source of truth for session count
     const index = await this.ctx.storage.get('session_index') as SessionIndexEntry[] || [];
     const totalSessions = index.length;
 
-    // Get today's sessions from the index
     const todayStr = new Date().toISOString().slice(0, 10);
     const todaySessions = index.filter((s) => s.startedAt.slice(0, 10) === todayStr);
 
-    // Get recent history (last 30 days with sessions)
     const recentSessions = index
       .filter((s) => s.summary)
       .slice(-30);

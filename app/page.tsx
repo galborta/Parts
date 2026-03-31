@@ -63,7 +63,7 @@ export default function Home() {
             transition={{ delay: 0.1 }}
           >
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-xs text-white/40">3 questions a day. Real progress.</span>
+            <span className="text-xs text-white/40">3 quick sessions a day. Real progress.</span>
           </motion.div>
 
           {/* Heading */}
@@ -75,7 +75,7 @@ export default function Home() {
           >
             <span className="text-white">Know yourself</span>
             <br />
-            <span className="gradient-text">one question at a time.</span>
+            <span className="gradient-text">one session at a time.</span>
           </motion.h1>
 
           <motion.p
@@ -84,8 +84,8 @@ export default function Home() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
           >
-            Every day, Parts asks you 3 questions that help you understand
-            your inner world. Short voice conversations. Real insights. Visible growth.
+            Every day, Parts guides you through 3 short voice sessions that help you understand
+            your inner world. Quick conversations. Real insights. Visible growth.
           </motion.p>
 
           <motion.p
@@ -94,7 +94,7 @@ export default function Home() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.5 }}
           >
-            Based on Internal Family Systems — an evidence-based therapeutic model
+            Based on Motivational Interviewing + ACT — evidence-based methodologies
           </motion.p>
 
           {/* CTA */}

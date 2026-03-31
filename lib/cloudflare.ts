@@ -93,3 +93,34 @@ export async function getMeta() {
   const res = await fetchFromWorker('/api/psyche/api/meta');
   return res.json();
 }
+
+// ── Server-side worker fetch (used by Next.js API routes) ───────
+// This runs in Node.js (not browser), so we use Buffer for base64.
+
+export async function serverWorkerFetch(
+  path: string,
+  userId: string,
+  email: string,
+  name: string,
+  options: RequestInit = {},
+): Promise<Response> {
+  const WORKER_URL =
+    process.env.WORKER_URL ||
+    process.env.NEXT_PUBLIC_WORKER_URL ||
+    'http://localhost:8787';
+
+  const header = Buffer.from(JSON.stringify({ alg: 'none' })).toString('base64');
+  const payload = Buffer.from(
+    JSON.stringify({ userId, email, exp: Math.floor(Date.now() / 1000) + 3600 }),
+  ).toString('base64');
+  const token = `${header}.${payload}.nosig`;
+
+  return fetch(`${WORKER_URL}${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      ...(options.headers as Record<string, string> || {}),
+    },
+  });
+}

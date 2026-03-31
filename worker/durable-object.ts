@@ -33,6 +33,9 @@ interface UserMeta {
   language: 'en' | 'es';
   createdAt: string;
   onboarding: { completed: boolean; currentStep: number };
+  sessionCount: number;
+  streak: number;
+  lastSessionDate: string; // YYYY-MM-DD
 }
 
 interface Part {
@@ -85,6 +88,7 @@ export class UserPsyche extends DurableObject<Env> {
     if (pathname === '/api/session/summary'  && request.method === 'POST')  return this.handleSaveSessionSummary(request);
     if (pathname === '/api/sessions'         && request.method === 'GET')   return this.handleGetSessions();
     if (pathname === '/api/insights'         && request.method === 'GET')   return this.handleGetInsights();
+    if (pathname === '/api/progress'         && request.method === 'GET')   return this.handleGetProgress();
     if (pathname === '/api/onboarding/complete' && request.method === 'POST') return this.handleCompleteOnboarding();
 
     return Response.json({ error: 'Not found' }, { status: 404 });
@@ -127,6 +131,9 @@ export class UserPsyche extends DurableObject<Env> {
       language: 'en',
       createdAt: new Date().toISOString(),
       onboarding: { completed: false, currentStep: 0 },
+      sessionCount: 0,
+      streak: 0,
+      lastSessionDate: '',
     };
     await this.ctx.storage.put('meta', meta);
     await this.ctx.storage.put('parts', []);
@@ -232,6 +239,22 @@ export class UserPsyche extends DurableObject<Env> {
       await this.ctx.storage.put('parts', parts);
     }
 
+    // Update meta: sessionCount, streak, lastSessionDate
+    const meta = await this.ctx.storage.get('meta') as UserMeta | undefined;
+    if (meta) {
+      const todayStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      if (meta.lastSessionDate !== todayStr) {
+        // First session of the day — check streak
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toISOString().slice(0, 10);
+        meta.streak = meta.lastSessionDate === yesterdayStr ? (meta.streak || 0) + 1 : 1;
+        meta.lastSessionDate = todayStr;
+      }
+      meta.sessionCount = (meta.sessionCount || 0) + 1;
+      await this.ctx.storage.put('meta', meta);
+    }
+
     return Response.json({ session });
   }
 
@@ -265,6 +288,33 @@ export class UserPsyche extends DurableObject<Env> {
   private async handleGetInsights(): Promise<Response> {
     const insights = await this.ctx.storage.get('insights') || [];
     return Response.json({ insights });
+  }
+
+  // ── Progress ──────────────────────────────────────────────
+  private async handleGetProgress(): Promise<Response> {
+    const meta = await this.ctx.storage.get('meta') as UserMeta | undefined;
+    if (!meta) return Response.json({ error: 'User not initialized' }, { status: 404 });
+
+    // Get today's sessions from the index
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const index = await this.ctx.storage.get('session_index') as SessionIndexEntry[] || [];
+    const todaySessions = index.filter((s) => s.startedAt.slice(0, 10) === todayStr);
+
+    // Get recent history (last 30 days with sessions)
+    const recentSessions = index
+      .filter((s) => s.summary)
+      .slice(-30);
+
+    return Response.json({
+      sessionCount: meta.sessionCount || 0,
+      streak: meta.streak || 0,
+      lastSessionDate: meta.lastSessionDate || '',
+      todaySessionCount: todaySessions.length,
+      todaySummaries: todaySessions
+        .map((s) => s.summary)
+        .filter((s): s is string => Boolean(s)),
+      recentHistory: recentSessions,
+    });
   }
 
   // ── Onboarding ────────────────────────────────────────────

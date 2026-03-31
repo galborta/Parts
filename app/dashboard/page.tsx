@@ -11,112 +11,76 @@ const VOICES = [
   { id: 'compassionate', name: 'Victoria', role: 'The Compassionate', color: '#34d399', icon: '💚' },
 ];
 
-interface DayProgress {
-  date: string;
-  answers: string[];
-  consejo?: string;
-}
-
-interface UserProgress {
-  totalDays: number;
+interface ProgressData {
+  sessionCount: number;
   streak: number;
-  currentDay: DayProgress;
-  history: DayProgress[];
-  lastDate: string;
-}
-
-function getDefaultProgress(): UserProgress {
-  return {
-    totalDays: 0,
-    streak: 0,
-    currentDay: { date: new Date().toDateString(), answers: [] },
-    history: [],
-    lastDate: '',
-  };
+  lastSessionDate: string;
+  todaySessionCount: number;
+  todaySummaries: string[];
+  recentHistory: Array<{ id: string; startedAt: string; summary?: string }>;
 }
 
 export default function DashboardPage() {
   const { data: session } = useSession();
   const [showSession, setShowSession] = useState(false);
   const [showConsejo, setShowConsejo] = useState(false);
-  const [progress, setProgress] = useState<UserProgress>(getDefaultProgress());
+  const [progress, setProgress] = useState<ProgressData>({
+    sessionCount: 0, streak: 0, lastSessionDate: '',
+    todaySessionCount: 0, todaySummaries: [], recentHistory: [],
+  });
+  const [loading, setLoading] = useState(true);
 
-  const today = new Date().toDateString();
-  const questionsToday = progress.currentDay.date === today ? progress.currentDay.answers.length : 0;
-  const currentVoice = VOICES[questionsToday] || VOICES[0];
+  const questionsToday = progress.todaySessionCount;
   const allDone = questionsToday >= 3;
-  const consejoReady = allDone && !progress.currentDay.consejo;
 
-  // Load progress
-  useEffect(() => {
-    const saved = localStorage.getItem('parts_progress_v2');
-    if (saved) {
-      const data: UserProgress = JSON.parse(saved);
-      if (data.currentDay.date !== today) {
-        // New day
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        const newStreak = data.lastDate === yesterday.toDateString() ? data.streak + 1 : (data.lastDate === today ? data.streak : 0);
-        const history = data.currentDay.answers.length > 0
-          ? [data.currentDay, ...data.history].slice(0, 30)
-          : data.history;
-        setProgress({
-          ...data,
-          streak: newStreak,
-          currentDay: { date: today, answers: [] },
-          history,
-        });
-      } else {
+  // Load progress from DO (per-user, server-side)
+  const fetchProgress = useCallback(async () => {
+    try {
+      const res = await fetch('/api/progress');
+      if (res.ok) {
+        const data: ProgressData = await res.json();
         setProgress(data);
       }
+    } catch (err) {
+      console.error('[Parts] Failed to fetch progress:', err);
+    } finally {
+      setLoading(false);
     }
-  }, [today]);
-
-  const saveProgress = useCallback((updated: UserProgress) => {
-    setProgress(updated);
-    localStorage.setItem('parts_progress_v2', JSON.stringify(updated));
   }, []);
+
+  useEffect(() => { fetchProgress(); }, [fetchProgress]);
 
   const handleStartSession = useCallback(() => {
     if (allDone) return;
     setShowSession(true);
   }, [allDone]);
 
-  const handleEndSession = useCallback((transcript?: string) => {
+  const handleEndSession = useCallback(async (transcript?: string) => {
     setShowSession(false);
-    const answer = transcript || 'Session completed';
-    const updatedDay = {
-      ...progress.currentDay,
-      date: today,
-      answers: [...progress.currentDay.answers, answer],
-    };
-    const updated: UserProgress = {
-      ...progress,
-      currentDay: updatedDay,
-      totalDays: progress.currentDay.answers.length === 0 ? progress.totalDays + 1 : progress.totalDays,
-      lastDate: today,
-    };
+
+    // Optimistically update local state
+    setProgress((prev) => ({
+      ...prev,
+      todaySessionCount: prev.todaySessionCount + 1,
+      sessionCount: prev.sessionCount + 1,
+      todaySummaries: [...prev.todaySummaries, transcript || 'Session completed'],
+    }));
 
     // If this was the 3rd question, show consejo
-    if (updatedDay.answers.length >= 3) {
+    if (questionsToday + 1 >= 3) {
       setShowConsejo(true);
     }
 
-    saveProgress(updated);
-  }, [progress, today, saveProgress]);
+    // Refresh from DO to get accurate data
+    setTimeout(() => fetchProgress(), 2000);
+  }, [questionsToday, fetchProgress]);
 
   const handleConsejoSeen = useCallback(() => {
-    const consejo = generateConsejo(progress.currentDay.answers);
-    const updated = {
-      ...progress,
-      currentDay: { ...progress.currentDay, consejo },
-    };
-    saveProgress(updated);
     setShowConsejo(false);
-  }, [progress, saveProgress]);
+  }, []);
 
-  const level = Math.floor(progress.totalDays / 3) + 1;
-  const progressInLevel = (progress.totalDays % 3) / 3;
+  const level = Math.floor(progress.sessionCount / 3) + 1;
+  const progressInLevel = (progress.sessionCount % 3) / 3;
 
   return (
     <div className="min-h-screen w-full bg-[#080f0b] relative overflow-hidden">
@@ -153,16 +117,16 @@ export default function DashboardPage() {
           </h1>
           <p className="text-sm text-white/20">
             {allDone
-              ? progress.currentDay.consejo ? "Today's complete. See your consejo below." : "All 3 voices have spoken."
-              : `Voice ${questionsToday + 1} of 3 is ready.`}
+              ? "All 3 voices have spoken."
+              : loading ? 'Loading...' : `Voice ${questionsToday + 1} of 3 is ready.`}
           </p>
         </motion.div>
 
         {/* Stats */}
         <motion.div className="grid grid-cols-3 gap-3 mb-6" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
           <div className="glass rounded-xl p-3 text-center">
-            <div className="text-xl font-bold text-white/80">{progress.totalDays}</div>
-            <div className="text-[10px] text-white/20 uppercase tracking-wider">Days</div>
+            <div className="text-xl font-bold text-white/80">{progress.sessionCount}</div>
+            <div className="text-[10px] text-white/20 uppercase tracking-wider">Sessions</div>
           </div>
           <div className="glass rounded-xl p-3 text-center">
             <div className="text-xl font-bold text-white/80">{progress.streak}</div>
@@ -229,9 +193,9 @@ export default function DashboardPage() {
                       </span>
                       <span className="text-[10px] text-white/15">{voice.role}</span>
                     </div>
-                    {isDone && progress.currentDay.answers[i] && (
+                    {isDone && progress.todaySummaries[i] && (
                       <p className="text-xs text-white/20 mt-1 truncate">
-                        {progress.currentDay.answers[i]}
+                        {progress.todaySummaries[i]}
                       </p>
                     )}
                     {isCurrent && (
@@ -255,29 +219,17 @@ export default function DashboardPage() {
           </div>
         </motion.div>
 
-        {/* El Consejo — unlocked after 3 questions */}
-        {progress.currentDay.consejo && (
-          <motion.div
-            className="mb-8"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <h2 className="text-xs uppercase tracking-wider text-white/20 mb-3">Today's Consejo</h2>
-            <div className="rounded-xl p-5 glow-md" style={{ background: 'linear-gradient(135deg, rgba(52,211,153,0.08), rgba(16,185,129,0.04))' , border: '1px solid rgba(52,211,153,0.15)' }}>
-              <p className="text-sm text-white/50 leading-relaxed">{progress.currentDay.consejo}</p>
-            </div>
-          </motion.div>
-        )}
-
-        {/* History */}
-        {progress.history.length > 0 && (
+        {/* Session History */}
+        {progress.recentHistory.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
-            <h2 className="text-xs uppercase tracking-wider text-white/20 mb-3">Past Consejos</h2>
+            <h2 className="text-xs uppercase tracking-wider text-white/20 mb-3">Recent Sessions</h2>
             <div className="space-y-2">
-              {progress.history.filter(d => d.consejo).slice(0, 5).map((day, i) => (
-                <div key={i} className="glass rounded-lg px-4 py-3">
-                  <p className="text-[10px] text-white/10 mb-1">{day.date}</p>
-                  <p className="text-xs text-white/25">{day.consejo}</p>
+              {progress.recentHistory.slice(-5).reverse().map((s, i) => (
+                <div key={s.id || i} className="glass rounded-lg px-4 py-3">
+                  <p className="text-[10px] text-white/10 mb-1">
+                    {new Date(s.startedAt).toLocaleDateString()}
+                  </p>
+                  {s.summary && <p className="text-xs text-white/25">{s.summary}</p>}
                 </div>
               ))}
             </div>
@@ -295,7 +247,7 @@ export default function DashboardPage() {
           <SessionView
             partId="free"
             voiceIndex={questionsToday}
-            previousAnswers={progress.currentDay.answers}
+            previousAnswers={progress.todaySummaries}
             onEnd={handleEndSession}
           />
         )}
@@ -324,7 +276,7 @@ export default function DashboardPage() {
 
               <div className="rounded-xl p-6 mb-8 text-left glow-md" style={{ background: 'linear-gradient(135deg, rgba(52,211,153,0.08), rgba(16,185,129,0.04))', border: '1px solid rgba(52,211,153,0.15)' }}>
                 <p className="text-sm text-white/50 leading-relaxed">
-                  {generateConsejo(progress.currentDay.answers)}
+                  {generateConsejo(progress.todaySummaries)}
                 </p>
               </div>
 

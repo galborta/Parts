@@ -25,6 +25,7 @@ function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: Sessio
   const [doSessionId, setDoSessionId]           = useState<string | null>(null);
   const transcriptRef = useRef<Array<{ speaker: 'user' | 'ai'; text: string; timestamp: string }>>([]);
   const startTimeRef  = useRef(Date.now());
+  const shouldEndRef  = useRef(false);
   const voice = VOICES[voiceIndex] || VOICES[0];
 
   const conversation = useConversation({
@@ -89,12 +90,20 @@ function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: Sessio
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-end after 90 seconds
+  // Auto-end: at 90s set flag to end after AI finishes speaking, hard cap at 120s
   useEffect(() => {
-    const timer = setTimeout(() => handleEndSession(), 90_000);
-    return () => clearTimeout(timer);
+    const softTimer = setTimeout(() => { shouldEndRef.current = true; }, 90_000);
+    const hardTimer = setTimeout(() => handleEndSession(), 120_000);
+    return () => { clearTimeout(softTimer); clearTimeout(hardTimer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // End session once AI stops speaking (if soft timer has fired)
+  useEffect(() => {
+    if (!isSpeaking && shouldEndRef.current) {
+      handleEndSession();
+    }
+  }, [isSpeaking, handleEndSession]);
 
   // ── End session ──────────────────────────────────────────
   const handleEndSession = useCallback(async () => {

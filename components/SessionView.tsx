@@ -62,12 +62,13 @@ function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: Sessio
         });
         const data = await res.json();
 
-        // 2. Create a DO session record (for history tracking)
+        // 2. Create a DO session record (for history tracking) via Next.js API
         try {
-          const { initUserPsyche, startSession: doStart } = await import('@/lib/cloudflare');
-          await initUserPsyche(data.email || '');
-          const doRes = await doStart('free');
-          if (doRes?.session?.id) setDoSessionId(doRes.session.id);
+          const doRes = await fetch('/api/session/do-start', { method: 'POST' });
+          if (doRes.ok) {
+            const doData = await doRes.json();
+            if (doData?.sessionId) setDoSessionId(doData.sessionId);
+          }
         } catch { /* non-critical */ }
 
         // 3. Start ElevenLabs with the dynamic system prompt injected as an override

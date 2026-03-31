@@ -98,13 +98,6 @@ function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: Sessio
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // End session once AI stops speaking (if soft timer has fired)
-  useEffect(() => {
-    if (!isSpeaking && shouldEndRef.current) {
-      handleEndSession();
-    }
-  }, [isSpeaking, handleEndSession]);
-
   // ── End session ──────────────────────────────────────────
   const handleEndSession = useCallback(async () => {
     if (sessionReady) {
@@ -132,6 +125,13 @@ function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: Sessio
 
     onEnd(lastUserMessage || summary || 'Session completed');
   }, [conversation, sessionReady, onEnd, lastUserMessage, doSessionId]);
+
+  // End session once AI stops speaking (if soft timer has fired)
+  useEffect(() => {
+    if (!isSpeaking && shouldEndRef.current) {
+      handleEndSession();
+    }
+  }, [isSpeaking, handleEndSession]);
 
   const speakerName = isSpeaking ? voice.name : 'Listening...';
 

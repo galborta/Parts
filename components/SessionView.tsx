@@ -18,6 +18,7 @@ interface SessionViewProps {
 }
 
 function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: SessionViewProps) {
+  const [waitingForTap, setWaitingForTap] = useState(true);
   const [sessionReady, setSessionReady] = useState(false);
   const [sessionEnded, setSessionEnded] = useState(false);
   const [lastUserMessage, setLastUserMessage]   = useState('');
@@ -64,52 +65,49 @@ function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: Sessio
 
   const { status, isSpeaking } = conversation;
 
-  // ── Start session ────────────────────────────────────────
-  useEffect(() => {
-    const start = async () => {
+  // ── Start session (triggered by user tap to satisfy mobile audio policy) ──
+  const handleBegin = useCallback(async () => {
+    setWaitingForTap(false);
+    try {
+      const res = await fetch('/api/session/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ voiceIndex, previousAnswers }),
+      });
+      const data = await res.json();
+
+      // Create DO session record
       try {
-        const res = await fetch('/api/session/start', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ voiceIndex, previousAnswers }),
-        });
-        const data = await res.json();
-
-        // Create DO session record
-        try {
-          const doRes = await fetch('/api/session/do-start', { method: 'POST' });
-          if (doRes.ok) {
-            const doData = await doRes.json();
-            if (doData?.sessionId) setDoSessionId(doData.sessionId);
-          }
-        } catch { /* non-critical */ }
-
-        // Register end_session client tool
-        const clientTools = {
-          end_session: () => {
-            setSessionEnded(true);
-            return 'ok';
-          },
-        };
-
-        if (data.signedUrl) {
-          const startOpts: any = { signedUrl: data.signedUrl, clientTools };
-          if (data.systemPrompt) {
-            startOpts.overrides = {
-              agent: { prompt: { prompt: data.systemPrompt } },
-            };
-          }
-          await conversation.startSession(startOpts);
-        } else if (data.agentId) {
-          await conversation.startSession({ agentId: data.agentId, clientTools });
+        const doRes = await fetch('/api/session/do-start', { method: 'POST' });
+        if (doRes.ok) {
+          const doData = await doRes.json();
+          if (doData?.sessionId) setDoSessionId(doData.sessionId);
         }
-      } catch (err) {
-        console.error('[Parts] Failed to start session:', err);
+      } catch { /* non-critical */ }
+
+      // Register end_session client tool
+      const clientTools = {
+        end_session: () => {
+          setSessionEnded(true);
+          return 'ok';
+        },
+      };
+
+      if (data.signedUrl) {
+        const startOpts: any = { signedUrl: data.signedUrl, clientTools };
+        if (data.systemPrompt) {
+          startOpts.overrides = {
+            agent: { prompt: { prompt: data.systemPrompt } },
+          };
+        }
+        await conversation.startSession(startOpts);
+      } else if (data.agentId) {
+        await conversation.startSession({ agentId: data.agentId, clientTools });
       }
-    };
-    start();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    } catch (err) {
+      console.error('[Baseline] Failed to start session:', err);
+    }
+  }, [conversation, voiceIndex, previousAnswers]);
 
   // Hard cap at 120s — absolute safety net
   useEffect(() => {
@@ -172,71 +170,101 @@ function SessionViewInner({ partId, voiceIndex, previousAnswers, onEnd }: Sessio
 
   return (
     <motion.div
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#080f0b] p-6"
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#0f0c1a] p-6"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
     >
-      {/* Status indicator */}
-      <motion.div
-        className="absolute top-6 left-6 flex items-center gap-3"
-        initial={{ opacity: 0, x: -10 }}
-        animate={{ opacity: 1, x: 0 }}
-      >
-        <div
-          className="w-2 h-2 rounded-full"
-          style={{
-            backgroundColor:
-              status === 'connected'  ? '#22c55e' :
-              status === 'connecting' ? '#f59e0b' : '#ef4444',
-          }}
-        />
-        <span className="text-xs text-white/30">
-          {status === 'connecting' ? 'Connecting...' : voice.role}
-        </span>
-      </motion.div>
-
-      {/* Voice identity */}
-      <motion.div
-        className="mb-8 text-center"
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-      >
-        <span className="text-xs text-white/15 uppercase tracking-wider">{voice.role}</span>
-        <h2 className="text-lg font-medium text-white/50">{voice.name}</h2>
-      </motion.div>
-
-      {/* Orb */}
-      <VoiceOrb isSpeaking={isSpeaking} speakerName={speakerName} color={voice.color} />
-
-      {/* Last AI message */}
-      {lastAiMessage && (
-        <motion.p
-          className="mt-8 text-sm text-white/25 max-w-sm text-center leading-relaxed"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          key={lastAiMessage.slice(0, 20)}
+      {waitingForTap ? (
+        /* ── Pre-session: "Begin" screen ── */
+        <motion.div
+          className="text-center"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
         >
-          &ldquo;{lastAiMessage}&rdquo;
-        </motion.p>
+          <div
+            className="w-20 h-20 rounded-full mx-auto mb-6 flex items-center justify-center text-3xl"
+            style={{ background: `radial-gradient(circle, ${voice.color}30, ${voice.color}10)` }}
+          >
+            {voice.icon}
+          </div>
+          <span className="text-xs text-white/15 uppercase tracking-wider">{voice.role}</span>
+          <h2 className="text-lg font-medium text-white/50 mb-8">{voice.name}</h2>
+          <motion.button
+            onClick={handleBegin}
+            className="px-8 py-4 rounded-full text-white/80 text-lg font-medium"
+            style={{ background: `linear-gradient(135deg, ${voice.color}40, ${voice.color}20)`, border: `1px solid ${voice.color}30` }}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            Begin
+          </motion.button>
+        </motion.div>
+      ) : (
+        /* ── Active session ── */
+        <>
+          {/* Status indicator */}
+          <motion.div
+            className="absolute top-6 left-6 flex items-center gap-3"
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+          >
+            <div
+              className="w-2 h-2 rounded-full"
+              style={{
+                backgroundColor:
+                  status === 'connected'  ? '#22c55e' :
+                  status === 'connecting' ? '#f59e0b' : '#ef4444',
+              }}
+            />
+            <span className="text-xs text-white/30">
+              {status === 'connecting' ? 'Connecting...' : voice.role}
+            </span>
+          </motion.div>
+
+          {/* Voice identity */}
+          <motion.div
+            className="mb-8 text-center"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            <span className="text-xs text-white/15 uppercase tracking-wider">{voice.role}</span>
+            <h2 className="text-lg font-medium text-white/50">{voice.name}</h2>
+          </motion.div>
+
+          {/* Orb */}
+          <VoiceOrb isSpeaking={isSpeaking} speakerName={speakerName} color={voice.color} />
+
+          {/* Last AI message */}
+          {lastAiMessage && (
+            <motion.p
+              className="mt-8 text-sm text-white/25 max-w-sm text-center leading-relaxed"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              key={lastAiMessage.slice(0, 20)}
+            >
+              &ldquo;{lastAiMessage}&rdquo;
+            </motion.p>
+          )}
+
+          {/* End button */}
+          <motion.div
+            className="absolute bottom-10 flex items-center gap-4"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+          >
+            <button
+              onClick={handleManualEnd}
+              className="px-6 py-3 rounded-full bg-white/[0.06] text-white/40
+                hover:bg-white/[0.1] hover:text-white/60 transition-colors text-sm"
+            >
+              End
+            </button>
+          </motion.div>
+        </>
       )}
-
-      {/* End button */}
-      <motion.div
-        className="absolute bottom-10 flex items-center gap-4"
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-      >
-        <button
-          onClick={handleManualEnd}
-          className="px-6 py-3 rounded-full bg-white/[0.06] text-white/40
-            hover:bg-white/[0.1] hover:text-white/60 transition-colors text-sm"
-        >
-          End
-        </button>
-      </motion.div>
     </motion.div>
   );
 }
